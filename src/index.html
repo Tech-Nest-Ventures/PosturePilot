@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PosturePilot</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>PosturePilot</h1>
+            <p>Your personal posture monitoring assistant</p>
+        </header>
+
+        <main>
+            <!-- Setup Phase -->
+            <div id="setup-screen" class="screen active">
+                <h2>Initial Setup</h2>
+                <p>Let's establish your baseline posture. Please sit up straight with your shoulders back.</p>
+                <div class="camera-container">
+                    <video id="video" autoplay muted></video>
+                    <canvas id="canvas" style="display: none;"></canvas>
+                    <canvas id="overlay" class="overlay"></canvas>
+                </div>
+                <div class="setup-controls">
+                    <button id="start-camera-btn">Start Camera</button>
+                    <button id="capture-btn" disabled>Capture Good Posture</button>
+                    <div class="progress">
+                        <span id="capture-count">0</span> / 5 baseline captures
+                    </div>
+                    <button id="finish-setup-btn" disabled>Finish Setup</button>
+                </div>
+            </div>
+
+            <!-- Monitoring Phase -->
+            <div id="monitor-screen" class="screen">
+                <h2>Posture Monitoring Active</h2>
+                <div class="camera-container">
+                    <video id="monitor-video" autoplay muted></video>
+                    <canvas id="monitor-overlay" class="overlay"></canvas>
+                </div>
+                <div class="status">
+                    <div id="posture-status" class="status-good">Good Posture</div>
+                    <div class="next-check">Next check in: <span id="countdown">30</span>s</div>
+                </div>
+                <div class="controls">
+                    <button id="pause-monitoring-btn">Pause Monitoring</button>
+                    <button id="recalibrate-btn">Recalibrate</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

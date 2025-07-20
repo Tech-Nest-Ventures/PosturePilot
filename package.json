@@ -1,0 +1,45 @@
+{
+  "name": "posture-pilot",
+  "version": "1.0.0",
+  "description": "A cross-platform posture monitoring app",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --enable-logging",
+    "build": "electron-builder",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --publish=never"
+  },
+  "keywords": ["electron", "posture", "health", "monitoring"],
+  "author": "PosturePilot",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^27.0.0",
+    "electron-builder": "^24.6.4"
+  },
+  "dependencies": {
+    "@mediapipe/pose": "^0.5.1675469404",
+    "@mediapipe/camera_utils": "^0.3.1675466862",
+    "@mediapipe/drawing_utils": "^0.3.1620248257"
+  },
+  "build": {
+    "appId": "com.posturepilot.app",
+    "productName": "PosturePilot",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.healthcare-fitness"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}

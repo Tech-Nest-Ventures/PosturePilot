@@ -1,0 +1,177 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    min-height: 100vh;
+}
+
+.container {
+    padding: 20px;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+header h1 {
+    font-size: 2.5em;
+    margin-bottom: 10px;
+    font-weight: 300;
+}
+
+header p {
+    opacity: 0.8;
+    font-size: 1.1em;
+}
+
+.screen {
+    display: none;
+    text-align: center;
+}
+
+.screen.active {
+    display: block;
+}
+
+.camera-container {
+    position: relative;
+    display: inline-block;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    margin: 20px 0;
+    background: #000;
+    min-height: 480px; /* Add minimum height */
+}
+
+.loading-message,
+.error-message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 1.2em;
+    text-align: center;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 20px;
+    border-radius: 10px;
+    width: 80%;
+    max-width: 400px;
+}
+
+.error-message {
+    color: #ff4444;
+    border: 1px solid #ff4444;
+}
+
+.loading-message {
+    color: #ffffff;
+    border: 1px solid #ffffff;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+}
+
+#video, #monitor-video {
+    width: 640px;
+    height: 480px;
+    display: block;
+}
+
+.overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 640px;
+    height: 480px;
+    pointer-events: none;
+}
+
+.setup-controls, .controls {
+    margin: 20px 0;
+}
+
+button {
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 12px 24px;
+    margin: 0 10px;
+    border-radius: 25px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+button:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: translateY(-2px);
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.progress {
+    margin: 20px 0;
+    font-size: 1.2em;
+    font-weight: 500;
+}
+
+.status {
+    margin: 20px 0;
+}
+
+#posture-status {
+    font-size: 1.5em;
+    font-weight: 600;
+    padding: 15px 30px;
+    border-radius: 25px;
+    display: inline-block;
+    margin-bottom: 15px;
+}
+
+.status-good {
+    background: rgba(76, 175, 80, 0.8);
+}
+
+.status-warning {
+    background: rgba(255, 152, 0, 0.8);
+    animation: pulse 2s infinite;
+}
+
+.status-bad {
+    background: rgba(244, 67, 54, 0.8);
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.next-check {
+    opacity: 0.8;
+    font-size: 1.1em;
+}
+
+#countdown {
+    font-weight: bold;
+}
