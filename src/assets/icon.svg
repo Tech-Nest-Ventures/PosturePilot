@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="512" cy="512" r="460" fill="#4A90E2"/>
+  <path d="M512 220
+           A60 60 0 0 1 512 340
+           A60 60 0 0 1 512 220
+           M512 340
+           L512 560
+           M412 450
+           L612 450
+           M462 560
+           L512 700
+           L562 560"
+        stroke="#FFFFFF"
+        stroke-width="80"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        fill="none"/>
+  <path d="M712 400
+           L772 460
+           L852 380"
+        stroke="#2ECC71"
+        stroke-width="40"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        fill="none"/>
+</svg> 

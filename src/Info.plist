@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>NSCameraUsageDescription</key>
+    <string>PosturePilot needs access to your camera to monitor your posture</string>
+    <key>NSCameraUseContinuityCameraDeviceType</key>
+    <true/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>PosturePilot does not use the microphone but some camera APIs require this permission</string>
+</dict>
+</plist> 

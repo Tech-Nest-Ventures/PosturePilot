@@ -8,19 +8,26 @@
     "dev": "electron . --enable-logging",
     "build": "electron-builder",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder --publish=never"
+    "dist": "electron-builder --publish=never",
+    "convert-icon": "node scripts/convert-icon.js"
   },
-  "keywords": ["electron", "posture", "health", "monitoring"],
+  "keywords": [
+    "electron",
+    "posture",
+    "health",
+    "monitoring"
+  ],
   "author": "PosturePilot",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^27.0.0",
-    "electron-builder": "^24.6.4"
+    "electron": "^37.2.3",
+    "electron-builder": "^26.0.12",
+    "svg2png": "^4.1.1"
   },
   "dependencies": {
-    "@mediapipe/pose": "^0.5.1675469404",
     "@mediapipe/camera_utils": "^0.3.1675466862",
-    "@mediapipe/drawing_utils": "^0.3.1620248257"
+    "@mediapipe/drawing_utils": "^0.3.1620248257",
+    "@mediapipe/pose": "^0.5.1675469404"
   },
   "build": {
     "appId": "com.posturepilot.app",
@@ -33,13 +40,21 @@
       "package.json"
     ],
     "mac": {
-      "category": "public.app-category.healthcare-fitness"
+      "category": "public.app-category.healthcare-fitness",
+      "icon": "src/assets/icon.png",
+      "extendInfo": {
+        "NSCameraUsageDescription": "PosturePilot needs access to your camera to monitor your posture",
+        "NSCameraUseContinuityCameraDeviceType": true,
+        "NSMicrophoneUsageDescription": "PosturePilot does not use the microphone but some camera APIs require this permission"
+      }
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "src/assets/icon.png"
     },
     "linux": {
-      "target": "AppImage"
+      "target": "AppImage",
+      "icon": "src/assets/icon.png"
     }
   }
 }
