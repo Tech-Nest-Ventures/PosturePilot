@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Notification } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
 
@@ -113,21 +113,90 @@ ipcMain.handle('save-posture-log', async (event, data) => {
 
 ipcMain.handle('show-notification', async (event, { title, body, type }) => {
   try {
-    if (Notification.isSupported()) {
-      const notification = new Notification({
-        title: title || 'PosturePilot',
-        body: body || 'Posture alert!',
-        icon: path.join(__dirname, 'icon.png') // Optional: add an icon
-      });
-      
-      notification.show();
-      return { success: true };
-    } else {
-      console.log('Notifications not supported');
+    // Check if notifications are supported
+    if (!Notification.isSupported()) {
+      console.log('Notifications not supported on this system');
       return { success: false, error: 'Notifications not supported' };
     }
+
+    // Check notification permission on Windows
+    if (process.platform === 'win32') {
+      // On Windows, we need to request permission if not granted
+      if (Notification.permission === 'default') {
+        // Request permission by showing a test notification
+        const testNotification = new Notification({
+          title: 'PosturePilot',
+          body: 'Posture monitoring is now active!',
+          silent: false,
+          timeoutType: 'default'
+        });
+        testNotification.show();
+      }
+    }
+
+    // Create notification with enhanced options for Windows
+    const notification = new Notification({
+      title: title || 'PosturePilot',
+      body: body || 'Posture alert!',
+      icon: path.join(__dirname, 'assets', 'icon.png'), // Use the icon from assets
+      silent: false, // Play notification sound
+      timeoutType: 'default', // Use system default timeout
+      urgency: type === 'bad' ? 'high' : 'normal', // Set urgency based on posture severity
+      actions: [
+        {
+          type: 'button',
+          text: 'Dismiss'
+        }
+      ]
+    });
+
+    // Add click handler to focus the app window
+    notification.on('click', () => {
+      if (mainWindow) {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    });
+
+    // Add action handler
+    notification.on('action', (event, index) => {
+      if (index === 0) { // Dismiss button
+        notification.close();
+      }
+    });
+
+    // Show the notification
+    notification.show();
+    
+    console.log('Notification shown:', { title, body, type });
+    return { success: true };
+    
   } catch (error) {
     console.error('Failed to show notification:', error);
     return { success: false, error: error.message };
+  }
+});
+
+// Add a handler to check notification permission
+ipcMain.handle('check-notification-permission', async () => {
+  try {
+    if (Notification.isSupported()) {
+      return { 
+        supported: true, 
+        permission: Notification.permission || 'granted' 
+      };
+    } else {
+      return { 
+        supported: false, 
+        permission: 'unsupported' 
+      };
+    }
+  } catch (error) {
+    console.error('Error checking notification permission:', error);
+    return { 
+      supported: false, 
+      permission: 'error',
+      error: error.message 
+    };
   }
 });

@@ -4,5 +4,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveBaselineData: (data) => ipcRenderer.invoke('save-baseline-data', data),
   getBaselineData: () => ipcRenderer.invoke('get-baseline-data'),
   savePostureLog: (data) => ipcRenderer.invoke('save-posture-log', data),
-  showNotification: (options) => ipcRenderer.invoke('show-notification', options)
+  showNotification: (options) => ipcRenderer.invoke('show-notification', options),
+  checkNotificationPermission: () => ipcRenderer.invoke('check-notification-permission')
 });

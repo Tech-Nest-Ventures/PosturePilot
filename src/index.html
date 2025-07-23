@@ -19,9 +19,10 @@
                 <h2>Initial Setup</h2>
                 <p>Let's establish your baseline posture. Please sit up straight with your shoulders back.</p>
                 <div class="camera-container">
+                    <button id="restart-camera-btn" style="margin-bottom: 10px;">Restart Camera</button>
                     <video id="video" autoplay muted></video>
                     <canvas id="canvas" style="display: none;"></canvas>
-                    <canvas id="overlay" class="overlay"></canvas>
+                    <canvas id="overlay" class="overlay" width="640" height="480"></canvas>
                 </div>
                 <div class="setup-controls">
                     <button id="start-camera-btn">Start Camera</button>

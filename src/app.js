@@ -11,9 +11,11 @@ class PosturePilot {
         this.shouldAnalyze = false;
         this.isMonitoring = false;
         this.isInitializing = false;  // Add initialization state
+        this.notificationEnabled = false; // Track notification status
         
         this.initializeElements();
         this.bindEvents();
+        this.checkNotificationPermission(); // Check notification permission on startup
     }
 
     initializeElements() {
@@ -35,6 +37,7 @@ class PosturePilot {
         this.finishSetupBtn = document.getElementById('finish-setup-btn');
         this.pauseMonitoringBtn = document.getElementById('pause-monitoring-btn');
         this.recalibrateBtn = document.getElementById('recalibrate-btn');
+        this.restartCameraBtn = document.getElementById('restart-camera-btn');
         
         // Status elements
         this.captureCount = document.getElementById('capture-count');
@@ -145,6 +148,7 @@ class PosturePilot {
         this.finishSetupBtn.addEventListener('click', () => this.finishSetup());
         this.pauseMonitoringBtn.addEventListener('click', () => this.toggleMonitoring());
         this.recalibrateBtn.addEventListener('click', () => this.recalibrate());
+        this.restartCameraBtn.addEventListener('click', () => this.restartCamera());
     }
 
     async initializeApp() {
@@ -157,15 +161,49 @@ class PosturePilot {
             loadingMsg.textContent = 'Initializing camera...';
             this.video.parentElement.appendChild(loadingMsg);
 
-            // First get camera permission
-            console.log('Requesting camera permission...');
+            // List available video devices
+            console.log('Enumerating video devices...');
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            console.log('Available video devices:', videoDevices.map(d => ({
+                deviceId: d.deviceId,
+                label: d.label || 'Unnamed camera',
+                groupId: d.groupId
+            })));
+
+            // Force use of the first available camera
+            let selectedDeviceId = videoDevices.length > 0 ? videoDevices[0].deviceId : undefined;
+            if (!selectedDeviceId) {
+                throw new Error('No video input devices found');
+            }
+            console.log('Forcing use of deviceId:', selectedDeviceId);
+
+            // Request camera permission for the selected device
+            console.log('Requesting camera permission for deviceId:', selectedDeviceId);
             const stream = await navigator.mediaDevices.getUserMedia({ 
                 video: { 
+                    deviceId: { exact: selectedDeviceId },
                     width: 640, 
                     height: 480,
                     facingMode: 'user'
                 } 
             });
+
+            // Log which camera was selected
+            const videoTrack = stream.getVideoTracks()[0];
+            console.log('Selected camera:', {
+                label: videoTrack.label,
+                settings: videoTrack.getSettings()
+            });
+
+            // Debug: log stream assignment
+            this.video.srcObject = null;
+            console.log('Assigning stream to video element...');
+            this.video.srcObject = stream;
+            setTimeout(() => {
+                console.log('Video element srcObject after assignment:', this.video.srcObject);
+                console.log('Video element readyState:', this.video.readyState);
+            }, 1000);
 
             loadingMsg.textContent = 'Loading pose detection...';
             // Once we have camera permission, initialize pose detection
@@ -213,8 +251,11 @@ class PosturePilot {
         
         // Wait for video to be ready
         await new Promise((resolve, reject) => {
-            this.video.onloadedmetadata = () => resolve();
+            this.video.onloadedmetadata = () => {
+                syncOverlayToVideo(this.video, this.overlay);
+            };
             this.video.onerror = (error) => reject(error);
+            resolve();
         });
 
         // Start video playing
@@ -270,6 +311,17 @@ class PosturePilot {
         
         // Start periodic monitoring
         this.startMonitoring();
+        
+        // Show startup notification
+        if (this.notificationEnabled) {
+            setTimeout(() => {
+                window.electronAPI.showNotification({
+                    title: '✅ PosturePilot Active',
+                    body: 'Posture monitoring is now active! You\'ll receive notifications every 30 seconds if posture issues are detected.',
+                    type: 'good'
+                });
+            }, 2000); // Delay by 2 seconds to let the UI settle
+        }
     }
 
     startMonitoring() {
@@ -326,6 +378,7 @@ class PosturePilot {
         let status = 'good';
         let message = 'Good Posture';
         let shouldNotify = false;
+        let notificationBody = '';
         
         // Forward head posture check - more comprehensive
         if (headForwardDiff > 0.015 || headVerticalDiff > 0.01 || Math.abs(noseAngleDiff) > 10) {
@@ -339,9 +392,11 @@ class PosturePilot {
             if (headForwardDiff > 0.03 || headVerticalDiff > 0.02 || Math.abs(noseAngleDiff) > 20) {
                 status = 'bad';
                 message = 'Severe Forward Head Posture';
+                notificationBody = 'Your head is positioned too far forward. Pull your head back and align it with your shoulders.';
             } else {
                 status = 'warning';
                 message = 'Forward Head Posture';
+                notificationBody = 'Your head is slightly forward. Try to pull it back to align with your shoulders.';
             }
             shouldNotify = true;
             console.log('Detected forward head posture:', {
@@ -356,6 +411,7 @@ class PosturePilot {
             const worstStatus = status === 'bad' ? status : 'warning';
             status = worstStatus;
             message = status === 'bad' ? message + ' with Head Tilt' : 'Head Tilt';
+            notificationBody = notificationBody || 'Your head is tilted. Try to keep your head level and centered.';
             shouldNotify = true;
             console.log('Detected head tilt:', neckTiltDiff.toFixed(4));
         }
@@ -363,10 +419,11 @@ class PosturePilot {
         // Update UI and show notification
         this.updatePostureStatus(status, message);
         
-        if (shouldNotify) {
+        if (shouldNotify && this.notificationEnabled) {
+            const notificationTitle = status === 'bad' ? '⚠️ Posture Alert' : '📝 Posture Reminder';
             window.electronAPI.showNotification({
-                title: 'PosturePilot Alert',
-                body: `${message}. Please adjust your posture.`,
+                title: notificationTitle,
+                body: notificationBody || `${message}. Please adjust your posture.`,
                 type: status
             });
         }
@@ -645,6 +702,25 @@ class PosturePilot {
         return avgData;
     }
 
+    async checkNotificationPermission() {
+        try {
+            const result = await window.electronAPI.checkNotificationPermission();
+            this.notificationEnabled = result.supported && result.permission === 'granted';
+            
+            if (result.supported) {
+                console.log('Notification permission status:', result.permission);
+                if (result.permission === 'denied') {
+                    console.warn('Notifications are disabled. Please enable them in Windows settings.');
+                }
+            } else {
+                console.warn('Notifications are not supported on this system');
+            }
+        } catch (error) {
+            console.error('Error checking notification permission:', error);
+            this.notificationEnabled = false;
+        }
+    }
+
     // Add cleanup method
     cleanup() {
         console.log('Cleaning up...');
@@ -664,9 +740,24 @@ class PosturePilot {
             this.pose = null;
         }
     }
+
+    restartCamera() {
+        console.log('Restarting camera...');
+        this.cleanup();
+        setTimeout(() => {
+            this.initializeApp();
+        }, 500);
+    }
 }
 
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     new PosturePilot();
 });
+
+function syncOverlayToVideo(video, overlay) {
+    overlay.width = video.videoWidth;
+    overlay.height = video.videoHeight;
+    overlay.style.width = video.offsetWidth + 'px';
+    overlay.style.height = video.offsetHeight + 'px';
+}
