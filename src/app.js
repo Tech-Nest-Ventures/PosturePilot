@@ -3,14 +3,25 @@ class PosturePilot {
         this.pose = null;
         this.camera = null;
         this.isSetupMode = true;
-        this.baselineCaptures = [];
-        this.baselineData = null;
+        // Remove manual baseline state
+        // Baseline arrays removed in Option A. We use automatic calibration instead
+        this.scaleFactor = null;           // average shoulder distance during calibration
+        this.calibrationSamples = [];
+        this.calibrationFramesNeeded = 60; // ≈2 s at 30 fps
+        this.isCalibrating = false;
         this.monitoringInterval = null;
         this.countdownInterval = null;
-        this.countdownValue = 30;
-        this.shouldAnalyze = false;
+        this.countdownValue = 5;
         this.isMonitoring = false;
         this.isInitializing = false;  // Add initialization state
+        
+        // Fixed ergonomic limits (units after scaling)
+        this.POSTURE_LIMITS = {
+            headForward: 0.25,      // horizontal ratio
+            neckTilt: 0.1,          // slope threshold
+            shoulderDistance: 0.15, // rounded shoulders threshold
+            shoulderSlope: 0.15     // uneven shoulders threshold
+        };
         
         this.initializeElements();
         this.bindEvents();
@@ -116,7 +127,7 @@ class PosturePilot {
                 // Set a timeout for the entire initialization process
                 initializationTimeout = setTimeout(() => {
                     reject(new Error('MediaPipe initialization timed out'));
-                }, 30000); // 30 second timeout
+                }, 5000); // 5 second timeout
 
                 // Start initialization
                 attemptInitialization();
@@ -240,7 +251,8 @@ class PosturePilot {
         console.log('Camera and video setup complete');
         
         this.startCameraBtn.textContent = 'Camera Ready';
-        this.captureBtn.disabled = false;
+        // Begin automatic calibration (Option A)
+        this.startCalibration();
     }
 
     switchToMonitoringMode() {
@@ -273,96 +285,93 @@ class PosturePilot {
     }
 
     startMonitoring() {
-        console.log('Starting monitoring...');
+        console.log('Starting monitoring (live mode)...');
         this.isMonitoring = true;
-        this.countdownValue = 30;
-        this.shouldAnalyze = false;
-        this.currentStatus = null;
-        this.updateCountdown();
-        
-        // Start the countdown for posture checks
-        this.countdownInterval = setInterval(() => {
-            console.log('Countdown:', this.countdownValue);
-            this.countdownValue -= 1;
-            this.updateCountdown();
-            
-            if (this.countdownValue <= 0) {
-                console.log('Countdown reached 0, should analyze posture now');
-                this.shouldAnalyze = true;
-                this.countdownValue = 30;
-            }
-        }, 1000);
+        // Show LIVE indicator instead of numerical countdown
+        if (this.countdown) {
+            this.countdown.textContent = 'LIVE';
+        }
+        // No countdown timer; posture will now be analyzed continuously in onPoseResults
     }
 
     updateCountdown() {
         this.countdown.textContent = this.countdownValue;
     }
 
+    // ------- Automatic calibration phase -------
+    startCalibration() {
+        console.log('Starting 2-second calibration…');
+        this.isCalibrating = true;
+        this.calibrationSamples = [];
+        if (this.countdown) {
+            this.countdown.textContent = 'CAL';
+        }
+    }
+
     analyzePosture(landmarks) {
+        if (!this.scaleFactor) return; // safety
+
         const currentData = this.extractKeypoints(landmarks);
-        
-        // Debug current data
-        console.log('Current Data:', currentData);
-        console.log('Baseline Data:', this.baselineData);
-        
-        // More sensitive heuristics for posture analysis
-        const shoulderSlopeDiff = Math.abs(currentData.shoulderSlope - this.baselineData.shoulderSlope);
-        const neckTiltDiff = Math.abs(currentData.neckTilt - this.baselineData.neckTilt);
-        const headForwardDiff = Math.abs(currentData.headForward.forward - this.baselineData.headForward.forward);
-        const headVerticalDiff = currentData.headForward.vertical - this.baselineData.headForward.vertical;
-        const noseAngleDiff = currentData.headForward.noseAngle - this.baselineData.headForward.noseAngle;
-        const shoulderDistanceDiff = Math.abs(currentData.shoulderDistance - this.baselineData.shoulderDistance);
-        
-        // Debug differences
-        console.log('Posture Differences:', {
-            shoulderSlopeDiff,
-            neckTiltDiff,
-            headForwardDiff,
-            headVerticalDiff,
-            noseAngleDiff,
-            shoulderDistanceDiff
-        });
-        
+
+        // Normalise linear distances to scaleFactor
+        const normForward = currentData.headForward.forward / this.scaleFactor;
+        const normShoulderDistanceChange = Math.abs(this.scaleFactor - currentData.shoulderDistance) / this.scaleFactor;
+
+        // Angle & tilt differences are absolute values
+        const neckTiltAbs = Math.abs(currentData.neckTilt);
+        const shoulderSlopeAbs = Math.abs(currentData.shoulderSlope);
+        const noseAngleAbs = Math.abs(currentData.headForward.noseAngle);
+
+        // Prepare diff object for UI
+        const diffs = {
+            normForward,
+            normShoulderDistanceChange,
+            shoulderSlopeAbs
+        };
+ 
+        console.log('Live posture metrics:', diffs);
+
+        // Update metrics panel UI
+        this.updateMetrics(diffs);
+
         let status = 'good';
         let message = 'Good Posture';
         let shouldNotify = false;
-        
-        // Forward head posture check - more comprehensive
-        if (headForwardDiff > 0.015 || headVerticalDiff > 0.01 || Math.abs(noseAngleDiff) > 10) {
-            console.log('Head position exceeds thresholds:', {
-                headForwardDiff,
-                headVerticalDiff,
-                noseAngleDiff
-            });
-            
-            // Check severity
-            if (headForwardDiff > 0.03 || headVerticalDiff > 0.02 || Math.abs(noseAngleDiff) > 20) {
-                status = 'bad';
-                message = 'Severe Forward Head Posture';
-            } else {
+
+        // Forward-head cluster
+        if (normForward > this.POSTURE_LIMITS.headForward) { 
+            status = normForward > this.POSTURE_LIMITS.headForward * 1.5  ? 'bad' : 'warning';
+            shouldNotify = true;
+        }
+
+        // Rounded shoulders
+        if (normShoulderDistanceChange > this.POSTURE_LIMITS.shoulderDistance) {
+            if (status === 'good') {
                 status = 'warning';
-                message = 'Forward Head Posture';
+                message = 'Rounded Shoulders';
+            } else {
+                message += ' & Rounded Shoulders';
             }
             shouldNotify = true;
-            console.log('Detected forward head posture:', {
-                forward: headForwardDiff.toFixed(4),
-                vertical: headVerticalDiff.toFixed(4),
-                noseAngle: noseAngleDiff.toFixed(4)
-            });
         }
-        
-        // Neck tilt check (using ears)
-        if (neckTiltDiff > 0.05) {
-            const worstStatus = status === 'bad' ? status : 'warning';
-            status = worstStatus;
-            message = status === 'bad' ? message + ' with Head Tilt' : 'Head Tilt';
+
+        // Neck lateral tilt
+        if (neckTiltAbs > this.POSTURE_LIMITS.neckTilt) {
+            status = status === 'bad' ? 'bad' : 'warning';
+            message = status === 'bad' ? message + ' & Head Tilt' : 'Head Tilt';
             shouldNotify = true;
-            console.log('Detected head tilt:', neckTiltDiff.toFixed(4));
         }
-        
-        // Update UI and show notification
+
+        // Shoulder height asymmetry
+        if (shoulderSlopeAbs > this.POSTURE_LIMITS.shoulderSlope) {
+            status = status === 'bad' ? 'bad' : 'warning';
+            message = status === 'bad' ? message + ' & Uneven Shoulders' : 'Uneven Shoulders';
+            shouldNotify = true;
+        }
+ 
+        // Update UI and notifications
         this.updatePostureStatus(status, message);
-        
+
         if (shouldNotify) {
             window.electronAPI.showNotification({
                 title: 'PosturePilot Alert',
@@ -370,8 +379,7 @@ class PosturePilot {
                 type: status
             });
         }
-        
-        // Log posture data
+
         window.electronAPI.savePostureLog({
             timestamp: Date.now(),
             status,
@@ -389,14 +397,49 @@ class PosturePilot {
         this.postureStatus.textContent = message;
     }
 
+    // Display live deviation values in the metrics panel
+    updateMetrics(diffs) {
+        // Map diff keys to DOM ids and relevant limit keys for percentage calc
+        const mapping = {
+            normForward: {
+                id: 'metric-normForward',
+                limitKey: 'headForward'
+            },
+            neckTiltAbs: {
+                id: 'metric-neckTiltAbs',
+                limitKey: 'neckTilt'
+            },
+            normShoulderDistanceChange: {
+                id: 'metric-normShoulderDistanceChange',
+                limitKey: 'shoulderDistance'
+            },
+            shoulderSlopeAbs: {
+                id: 'metric-shoulderSlopeAbs',
+                limitKey: 'shoulderSlope'
+            }
+        };
+
+        Object.entries(mapping).forEach(([diffKey, meta]) => {
+            const el = document.getElementById(meta.id);
+            if (!el) return;
+            const value = diffs[diffKey];
+            if (typeof value === 'undefined' || value === null) return;
+
+            const pct = Math.min((value / this.POSTURE_LIMITS[meta.limitKey]) * 100, 999);
+            el.textContent = `${pct.toFixed(0)}%`;
+        });
+    }
+
     toggleMonitoring() {
-        if (this.countdownInterval) {
-            clearInterval(this.countdownInterval);
-            this.countdownInterval = null;
-            this.shouldAnalyze = false;
+        if (this.isMonitoring) {
+            // Pause live monitoring
             this.isMonitoring = false;
             this.pauseMonitoringBtn.textContent = 'Resume Monitoring';
+            if (this.countdown) {
+                this.countdown.textContent = '--';
+            }
         } else {
+            // Resume live monitoring
             this.startMonitoring();
             this.pauseMonitoringBtn.textContent = 'Pause Monitoring';
         }
@@ -405,9 +448,11 @@ class PosturePilot {
     recalibrate() {
         console.log('Recalibrating...');
         this.isSetupMode = true;
-        this.baselineCaptures = [];
-        this.baselineData = null;
-        this.shouldAnalyze = false;
+        // Baseline arrays removed in Option A. We use automatic calibration instead
+        this.scaleFactor = null;           // average shoulder distance during calibration
+        this.calibrationSamples = [];
+        this.calibrationFramesNeeded = 60; // ≈2 s at 30 fps
+        this.isCalibrating = false;
         
         if (this.countdownInterval) {
             clearInterval(this.countdownInterval);
@@ -469,12 +514,24 @@ class PosturePilot {
                 radius: 3
             });
 
-            // Only analyze posture if we're in monitoring mode and flag is set
-            if (!this.isSetupMode && this.baselineData && this.shouldAnalyze) {
-                console.log('Starting posture analysis...');
+            // Handle calibration first
+            if (this.isCalibrating) {
+                const data = this.extractKeypoints(results.poseLandmarks);
+                this.calibrationSamples.push(data.shoulderDistance);
+                // Once enough frames collected, compute scaleFactor
+                if (this.calibrationSamples.length >= this.calibrationFramesNeeded) {
+                    const sum = this.calibrationSamples.reduce((a, b) => a + b, 0);
+                    this.scaleFactor = sum / this.calibrationSamples.length;
+                    this.isCalibrating = false;
+                    console.log('Calibration complete. scaleFactor:', this.scaleFactor.toFixed(4));
+                    this.switchToMonitoringMode();
+                }
+                return; // skip analysis until calibrated
+            }
+
+            // Analyze posture once calibrated and monitoring
+            if (!this.isSetupMode && this.isMonitoring && this.scaleFactor) {
                 this.analyzePosture(results.poseLandmarks);
-                this.shouldAnalyze = false;
-                console.log('Analysis complete, status:', this.currentStatus);
             }
         }
     }
@@ -533,10 +590,10 @@ class PosturePilot {
             keypoints.nose.x - keypoints.neck.x
         ) * (180 / Math.PI);
 
-        // Calculate forward distance
-        const forwardDistance = this.calculateDistance(earMidpoint, keypoints.neck);
+        // Calculate forward distance using horizontal (x-axis) displacement only
+        const forwardDistance = Math.abs(earMidpoint.x - keypoints.neck.x);
         
-        // Calculate vertical deviation
+        // Calculate vertical deviation relative to shoulder height
         const verticalDeviation = earMidpoint.y - keypoints.neck.y;
         
         // Calculate derived measurements focusing on upper body posture
@@ -549,7 +606,8 @@ class PosturePilot {
                 vertical: verticalDeviation,
                 noseAngle: noseToNeckAngle
             },
-            shoulderDistance: this.calculateDistance(keypoints.leftShoulder, keypoints.rightShoulder),
+            // Horizontal shoulder width for scale factor & rounded-shoulder metric
+            shoulderDistance: Math.abs(keypoints.leftShoulder.x - keypoints.rightShoulder.x),
             timestamp: Date.now()
         };
     }

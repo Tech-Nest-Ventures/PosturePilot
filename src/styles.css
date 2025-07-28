@@ -175,3 +175,33 @@ button:disabled {
 #countdown {
     font-weight: bold;
 }
+
+/* Metrics panel */
+.metrics {
+    margin: 20px auto;
+    width: 300px;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 15px 20px;
+    border-radius: 10px;
+    text-align: left;
+}
+
+.metrics h3 {
+    margin-bottom: 10px;
+    font-size: 1.1em;
+}
+
+.metrics ul {
+    list-style: none;
+    padding: 0;
+}
+
+.metrics li {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.metrics li span {
+    font-weight: 600;
+}

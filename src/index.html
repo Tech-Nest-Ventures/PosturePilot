@@ -42,7 +42,16 @@
                 </div>
                 <div class="status">
                     <div id="posture-status" class="status-good">Good Posture</div>
-                    <div class="next-check">Next check in: <span id="countdown">30</span>s</div>
+                    <div class="next-check">Status: <span id="countdown">--</span></div>
+                </div>
+                <div id="metrics-panel" class="metrics">
+                    <h3>Live Metrics</h3>
+                    <ul>
+                        <li>Head Forward: <span id="metric-normForward">0</span></li>
+                        <li>Neck Tilt (slope): <span id="metric-neckTiltAbs">0</span></li>
+                        <li>Shoulder Roundness: <span id="metric-normShoulderDistanceChange">0</span></li>
+                        <li>Shoulder Slope: <span id="metric-shoulderSlopeAbs">0</span></li>
+                    </ul>
                 </div>
                 <div class="controls">
                     <button id="pause-monitoring-btn">Pause Monitoring</button>
