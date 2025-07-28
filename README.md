@@ -1,142 +1,112 @@
-# PosturePilot
+# PosturePilot 🎯
 
-A cross-platform Electron app that monitors your posture using your webcam and AI-powered pose detection.
+An AI-powered posture coach that helps you maintain healthy ergonomic alignment while working at your computer.
 
-## Features
+## Core Features
 
-- **Real-time posture monitoring** using MediaPipe pose detection
-- **Guided setup** to establish your baseline good posture
-- **Smart heuristics** to detect:
-  - Forward head posture
-  - Hunched shoulders
-  - Uneven/asymmetrical shoulders
-- **30-second interval checks** with countdown timer
-- **Native notifications** for posture alerts
-- **Local data storage** for baseline and posture logs
-- **Cross-platform compatibility** (macOS, Windows, Linux)
+- **Real-time Posture Analysis**: Continuous monitoring using MediaPipe's pose detection
+- **Smart Ergonomic Metrics**:
+  - Forward Head Position (% of shoulder width)
+  - Shoulder Roundness (protraction/retraction)
+  - Neck Tilt (lateral flexion)
+  - Shoulder Height Asymmetry
+- **Instant Visual Feedback**: Color-coded status and live metrics
+- **Native Desktop Notifications**: Gentle reminders when posture needs adjustment
+- **Auto-Calibration**: 2-second setup that adapts to your camera position
+
+## Ergonomic Standards
+
+PosturePilot focuses on four key patterns that research links to musculoskeletal issues:
+
+1. **Forward Head Posture (FHP)** 
+   - Ideal: Ears aligned with shoulders
+   - Warning: >25% forward deviation
+   - Risk: Neck strain, upper back pain, headaches
+
+2. **Rounded Shoulders**
+   - Ideal: Shoulders relaxed and back
+   - Warning: >15% change in shoulder width
+   - Risk: Upper back pain, shoulder impingement
+
+3. **Neck Tilt**
+   - Ideal: Ears level (±10% slope)
+   - Warning: >10% lateral tilt
+   - Risk: Muscle imbalance, cervical strain
+
+4. **Shoulder Asymmetry**
+   - Ideal: Level shoulders (±15% height difference)
+   - Warning: >15% height disparity
+   - Risk: Compensatory patterns, scoliosis risk
+
+## Technical Implementation
+
+### Pose Detection
+- Uses MediaPipe Pose for real-time skeletal tracking
+- Extracts key landmarks: ears, nose, eyes, shoulders
+- 30fps analysis with smooth landmark tracking
+
+### Metric Calculations
+- **Forward Head**: Horizontal distance from ear midpoint to shoulder line
+- **Shoulder Roundness**: Change in horizontal shoulder width
+- **Neck Tilt**: Slope between ear landmarks
+- **Shoulder Asymmetry**: Slope of shoulder line
+
+### Auto-Calibration
+1. Captures ~60 frames (2 seconds)
+2. Establishes shoulder width as scaling factor
+3. All measurements normalized to shoulder width for consistency
 
 ## Installation
 
-1. **Clone and install dependencies:**
+1. Clone and install dependencies:
    ```bash
-   git clone <your-repo>
+   git clone <repo-url>
    cd PosturePilot
    npm install
    ```
 
-2. **Run the app:**
+2. Start the app:
    ```bash
    npm start
    ```
 
-3. **Build for production:**
-   ```bash
-   npm run build
-   ```
+## Usage
 
-## How to Use
-
-### Initial Setup
-1. Launch the app and click "Start Camera"
-2. Allow camera permissions when prompted
-3. Sit up straight with good posture (shoulders back, head aligned)
-4. Click "Capture Good Posture" 5 times to establish your baseline
-5. Click "Finish Setup" to start monitoring
-
-### Monitoring Mode
-- The app will check your posture every 30 seconds
-- Green status = Good posture
-- Orange status = Minor issues (forward head, hunched shoulders)
-- Red status = Poor posture (uneven shoulders)
-- Notifications will alert you when posture needs adjustment
-
-### Controls
-- **Pause/Resume Monitoring**: Temporarily stop posture checks
-- **Recalibrate**: Return to setup mode to re-establish baseline
-
-## Technical Details
-
-### Pose Detection
-- Uses MediaPipe Pose for real-time skeletal tracking
-- Extracts key landmarks: nose, shoulders, elbows, hips
-- Calculates derived measurements like shoulder slope and neck angle
-
-### Posture Analysis Heuristics
-- **Forward Head**: Neck angle deviation > 15° from baseline
-- **Hunched Shoulders**: Shoulder distance change > 0.05 units
-- **Uneven Shoulders**: Shoulder slope difference > 0.1 from baseline
-
-### Data Storage
-- Baseline posture data saved locally in app data directory
-- Posture logs maintained (last 1000 entries)
-- No data sent to external servers
-
-## File Structure
-
-```
-src/
-├── main.js          # Electron main process
-├── preload.js       # IPC bridge
-├── index.html       # Main UI
-├── styles.css       # Styling
-└── app.js           # Core application logic
-```
-
-## Development
-
-### Scripts
-- `npm start` - Run in development mode
-- `npm run dev` - Run with logging enabled
-- `npm run build` - Build for distribution
-- `npm run pack` - Package without distribution
-- `npm run dist` - Build and package for distribution
-
-### Requirements
-- Node.js 16+
-- Webcam access
-- Camera permissions
+1. Launch PosturePilot
+2. Allow camera access when prompted
+3. Wait 2 seconds for auto-calibration
+4. Monitor shows:
+   - Live metrics panel
+   - Status indicator
+   - Real-time skeletal overlay
 
 ## Privacy & Security
 
 - All processing happens locally on your device
-- No data is transmitted to external servers
-- Camera feed is processed in real-time and not stored
-- Only pose keypoints (mathematical coordinates) are saved locally
-
-## Browser Compatibility
-
-Works best with:
-- Electron (recommended)
-- Chrome/Chromium browsers
-- Safari (with MediaPipe support)
-- Firefox (with MediaPipe support)
-
-## Troubleshooting
-
-### Camera Issues
-- Ensure camera permissions are granted
-- Check if other apps are using the camera
-- Try restarting the app if camera fails to initialize
-
-### Pose Detection Issues
-- Ensure good lighting conditions
-- Sit at appropriate distance from camera (2-4 feet)
-- Keep upper body visible in camera frame
-- Avoid highly patterned clothing that might interfere
-
-### Performance
-- Close other camera-using applications
-- Ensure adequate system resources
-- Lower video resolution if experiencing lag
+- No video/images are stored or transmitted
+- Camera feed used only for real-time analysis
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test across platforms
-5. Submit a pull request
+We welcome contributions! Areas of interest:
+
+- Additional ergonomic metrics
+- UI/UX improvements
+- Performance optimizations
+- Cross-platform testing
 
 ## License
 
-MIT License - see LICENSE file for details
+MIT License - see LICENSE file for details.
+
+## Acknowledgments
+
+- MediaPipe team for pose detection
+- Ergonomic research from OSHA and NIOSH
+- Open-source community
+
+## Support
+
+- Issues: GitHub issue tracker
+- Questions: Discussions board
+- Updates: Star/watch repository
