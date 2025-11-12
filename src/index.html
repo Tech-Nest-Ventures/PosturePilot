@@ -8,16 +8,11 @@
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>PosturePilot</h1>
-            <p>Your personal posture monitoring assistant</p>
-        </header>
-
         <main>
             <!-- Setup Phase -->
             <div id="setup-screen" class="screen active">
                 <h2>Initial Setup</h2>
-                <p>Let's establish your baseline posture. Please sit up straight with your shoulders back.</p>
+                <p>Sit up straight with your shoulders back.</p>
                 <div class="camera-container">
                     <video id="video" autoplay muted></video>
                     <canvas id="canvas" style="display: none;"></canvas>
@@ -25,33 +20,34 @@
                 </div>
                 <div class="setup-controls">
                     <button id="start-camera-btn">Start Camera</button>
-                    <p class="calibration-info">After starting the camera, the app will automatically calibrate for 2 seconds. Please sit up straight with your shoulders back.</p>
                 </div>
             </div>
 
             <!-- Monitoring Phase -->
             <div id="monitor-screen" class="screen">
-                <h2>Posture Monitoring Active</h2>
-                <div class="camera-container">
-                    <video id="monitor-video" autoplay muted></video>
-                    <canvas id="monitor-overlay" class="overlay"></canvas>
-                </div>
-                <div class="status">
-                    <div id="posture-status" class="status-good">Good Posture</div>
-                    <div class="next-check">Status: <span id="countdown">--</span></div>
-                </div>
-                <div id="metrics-panel" class="metrics">
-                    <h3>Live Metrics</h3>
-                    <ul>
-                        <li>Head Forward: <span id="metric-normForward">0</span>%</li>
-                        <li>Neck Tilt: <span id="metric-neckTiltAbs">0</span>%</li>
-                        <li>Shoulder Slope: <span id="metric-shoulderSlopeAbs">0</span>%</li>
-                    </ul>
-                    <p class="metrics-note">All metrics are normalized to your shoulder width and shown as percentages of the threshold limits.</p>
-                </div>
-                <div class="controls">
-                    <button id="pause-monitoring-btn">Pause Monitoring</button>
-                    <button id="recalibrate-btn">Recalibrate</button>
+                <div class="monitor-layout">
+                    <div class="camera-container">
+                        <video id="monitor-video" autoplay muted></video>
+                        <canvas id="monitor-overlay" class="overlay"></canvas>
+                    </div>
+                    <div class="monitor-sidebar">
+                        <div class="sidebar-header">
+                            <div class="status">
+                                <div id="posture-status" class="status-good">Good Posture</div>
+                                <div class="next-check">Status: <span id="countdown">--</span></div>
+                            </div>
+                            <button id="pause-monitoring-btn" class="pause-btn">Pause Monitoring</button>
+                        </div>
+                        <div id="metrics-panel" class="metrics">
+                            <h3>Live Metrics</h3>
+                            <ul>
+                                <li>Head Forward: <span id="metric-normForward">0</span></li>
+                                <li>Neck Tilt: <span id="metric-neckTiltAbs">0</span></li>
+                                <li>Shoulder Slope: <span id="metric-shoulderSlopeAbs">0</span></li>
+                            </ul>
+                            <p class="metrics-note">All metrics are normalized to your shoulder width and shown as percentages of the threshold limits.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>

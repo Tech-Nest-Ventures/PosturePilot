@@ -44,7 +44,6 @@ class PosturePilot {
         this.captureBtn = document.getElementById('capture-btn');
         this.finishSetupBtn = document.getElementById('finish-setup-btn');
         this.pauseMonitoringBtn = document.getElementById('pause-monitoring-btn');
-        this.recalibrateBtn = document.getElementById('recalibrate-btn');
         
         // Status elements
         this.captureCount = document.getElementById('capture-count');
@@ -160,7 +159,6 @@ class PosturePilot {
             this.finishSetupBtn.style.display = 'none';
         }
         this.pauseMonitoringBtn.addEventListener('click', () => this.toggleMonitoring());
-        this.recalibrateBtn.addEventListener('click', () => this.recalibrate());
     }
 
     async initializeApp() {
@@ -414,7 +412,7 @@ class PosturePilot {
             if (typeof value === 'undefined' || value === null) return;
 
             const pct = Math.min((value / this.POSTURE_LIMITS[meta.limitKey]) * 100, 999);
-            el.textContent = `${pct.toFixed(0)}%`;
+            el.textContent = pct.toFixed(0);
         });
     }
 
@@ -491,8 +489,8 @@ class PosturePilot {
         const ctx = currentOverlay.getContext('2d');
         
         ctx.clearRect(0, 0, currentOverlay.width, currentOverlay.height);
-        currentOverlay.width = 640;
-        currentOverlay.height = 480;
+        currentOverlay.width = 400;
+        currentOverlay.height = 300;
         
         if (results.poseLandmarks) {
             // Store the latest results
