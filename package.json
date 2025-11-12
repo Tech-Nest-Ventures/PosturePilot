@@ -9,6 +9,9 @@
     "build": "electron-builder",
     "pack": "electron-builder --dir",
     "dist": "electron-builder --publish=never",
+    "build:mas": "electron-builder --mac mas",
+    "build:mas:dir": "electron-builder --mac mas --dir",
+    "dist:mas": "electron-builder --mac mas --publish=never",
     "convert-icon": "node scripts/convert-icon.js"
   },
   "keywords": [
@@ -43,10 +46,23 @@
       "category": "public.app-category.healthcare-fitness",
       "icon": "src/assets/icon.png",
       "extendInfo": {
-        "NSCameraUsageDescription": "PosturePilot needs access to your camera to monitor your posture",
+        "NSCameraUsageDescription": "PosturePilot needs access to your camera to monitor your posture in real-time using AI pose detection. All processing happens locally on your device.",
         "NSCameraUseContinuityCameraDeviceType": true,
         "NSMicrophoneUsageDescription": "PosturePilot does not use the microphone but some camera APIs require this permission"
-      }
+      },
+      "target": [
+        {
+          "target": "default"
+        },
+        {
+          "target": "mas",
+          "arch": ["arm64", "x64"]
+        }
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mas.plist",
+      "entitlementsInherit": "build/entitlements.mas.inherit.plist"
     },
     "win": {
       "target": "nsis",

@@ -19,7 +19,6 @@ class PosturePilot {
         this.POSTURE_LIMITS = {
             headForward: 0.25,      // horizontal ratio
             neckTilt: 0.1,          // slope threshold
-            shoulderDistance: 0.15, // rounded shoulders threshold
             shoulderSlope: 0.15     // uneven shoulders threshold
         };
         
@@ -152,8 +151,14 @@ class PosturePilot {
             this.startCameraBtn.textContent = 'Initializing...';
             await this.initializeApp();
         });
-        this.captureBtn.addEventListener('click', () => this.captureBaseline());
-        this.finishSetupBtn.addEventListener('click', () => this.finishSetup());
+        // Manual capture methods removed - app now uses automatic calibration
+        // this.captureBtn and this.finishSetupBtn are kept for backward compatibility but not used
+        if (this.captureBtn) {
+            this.captureBtn.style.display = 'none';
+        }
+        if (this.finishSetupBtn) {
+            this.finishSetupBtn.style.display = 'none';
+        }
         this.pauseMonitoringBtn.addEventListener('click', () => this.toggleMonitoring());
         this.recalibrateBtn.addEventListener('click', () => this.recalibrate());
     }
@@ -315,17 +320,15 @@ class PosturePilot {
 
         // Normalise linear distances to scaleFactor
         const normForward = currentData.headForward.forward / this.scaleFactor;
-        const normShoulderDistanceChange = Math.abs(this.scaleFactor - currentData.shoulderDistance) / this.scaleFactor;
 
         // Angle & tilt differences are absolute values
         const neckTiltAbs = Math.abs(currentData.neckTilt);
         const shoulderSlopeAbs = Math.abs(currentData.shoulderSlope);
-        const noseAngleAbs = Math.abs(currentData.headForward.noseAngle);
 
         // Prepare diff object for UI
         const diffs = {
             normForward,
-            normShoulderDistanceChange,
+            neckTiltAbs,
             shoulderSlopeAbs
         };
  
@@ -341,17 +344,6 @@ class PosturePilot {
         // Forward-head cluster
         if (normForward > this.POSTURE_LIMITS.headForward) { 
             status = normForward > this.POSTURE_LIMITS.headForward * 1.5  ? 'bad' : 'warning';
-            shouldNotify = true;
-        }
-
-        // Rounded shoulders
-        if (normShoulderDistanceChange > this.POSTURE_LIMITS.shoulderDistance) {
-            if (status === 'good') {
-                status = 'warning';
-                message = 'Rounded Shoulders';
-            } else {
-                message += ' & Rounded Shoulders';
-            }
             shouldNotify = true;
         }
 
@@ -408,10 +400,6 @@ class PosturePilot {
             neckTiltAbs: {
                 id: 'metric-neckTiltAbs',
                 limitKey: 'neckTilt'
-            },
-            normShoulderDistanceChange: {
-                id: 'metric-normShoulderDistanceChange',
-                limitKey: 'shoulderDistance'
             },
             shoulderSlopeAbs: {
                 id: 'metric-shoulderSlopeAbs',
@@ -477,9 +465,16 @@ class PosturePilot {
         this.monitorScreen.classList.remove('active');
         this.setupScreen.classList.add('active');
         
-        this.captureCount.textContent = '0';
-        this.captureBtn.disabled = false;
-        this.finishSetupBtn.disabled = true;
+        // Reset UI elements (capture count not used in auto-calibration mode)
+        if (this.captureCount) {
+            this.captureCount.textContent = '0';
+        }
+        if (this.captureBtn) {
+            this.captureBtn.disabled = true;
+        }
+        if (this.finishSetupBtn) {
+            this.finishSetupBtn.disabled = true;
+        }
         
         console.log('Returned to setup mode');
     }
@@ -536,28 +531,10 @@ class PosturePilot {
         }
     }
 
+    // Manual baseline capture removed - app now uses automatic calibration
+    // This method is kept for backward compatibility but should not be called
     captureBaseline() {
-        console.log('Attempting to capture baseline...');
-        if (this.baselineCaptures.length < 5) {
-            if (!this.lastPoseResults || !this.lastPoseResults.poseLandmarks) {
-                console.log('No valid pose data available');
-                alert('Please ensure you are visible and centered in the camera frame');
-                return;
-            }
-
-            console.log('Capturing pose data...');
-            const keypoints = this.extractKeypoints(this.lastPoseResults.poseLandmarks);
-            this.baselineCaptures.push(keypoints);
-            this.captureCount.textContent = this.baselineCaptures.length;
-            
-            if (this.baselineCaptures.length >= 5) {
-                console.log('Baseline capture complete');
-                this.finishSetupBtn.disabled = false;
-                this.captureBtn.disabled = true;
-            } else {
-                console.log(`Captured ${this.baselineCaptures.length} of 5 poses`);
-            }
-        }
+        console.warn('Manual baseline capture is no longer used. App uses automatic calibration.');
     }
 
     extractKeypoints(landmarks) {
@@ -657,50 +634,10 @@ class PosturePilot {
         return Math.atan2(dy, dx) * (180 / Math.PI);
     }
 
+    // Manual setup finish removed - app now uses automatic calibration
+    // This method is kept for backward compatibility but should not be called
     async finishSetup() {
-        console.log('Calculating baseline from captures:', this.baselineCaptures);
-        // Calculate baseline averages
-        this.baselineData = this.calculateBaselineAverages();
-        console.log('Calculated baseline data:', this.baselineData);
-        
-        // Save baseline data
-        await window.electronAPI.saveBaselineData(this.baselineData);
-        
-        // Switch to monitoring mode
-        this.switchToMonitoringMode();
-    }
-
-    calculateBaselineAverages() {
-        const avgData = {
-            shoulderSlope: 0,
-            neckTilt: 0,
-            headForward: {
-                forward: 0,
-                vertical: 0,
-                noseAngle: 0
-            },
-            shoulderDistance: 0,
-            count: this.baselineCaptures.length
-        };
-
-        this.baselineCaptures.forEach(capture => {
-            avgData.shoulderSlope += capture.shoulderSlope;
-            avgData.neckTilt += capture.neckTilt;
-            avgData.headForward.forward += capture.headForward.forward;
-            avgData.headForward.vertical += capture.headForward.vertical;
-            avgData.headForward.noseAngle += capture.headForward.noseAngle;
-            avgData.shoulderDistance += capture.shoulderDistance;
-        });
-
-        // Calculate averages
-        avgData.shoulderSlope /= avgData.count;
-        avgData.neckTilt /= avgData.count;
-        avgData.headForward.forward /= avgData.count;
-        avgData.headForward.vertical /= avgData.count;
-        avgData.headForward.noseAngle /= avgData.count;
-        avgData.shoulderDistance /= avgData.count;
-
-        return avgData;
+        console.warn('Manual setup finish is no longer used. App uses automatic calibration.');
     }
 
     // Add cleanup method
