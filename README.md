@@ -5,11 +5,10 @@ An AI-powered posture coach that helps you maintain healthy ergonomic alignment 
 ## Core Features
 
 - **Real-time Posture Analysis**: Continuous monitoring using MediaPipe's pose detection
-- **Smart Ergonomic Metrics**:
-  - Forward Head Position (% of shoulder width)
-  - Shoulder Roundness (protraction/retraction)
-  - Neck Tilt (lateral flexion)
-  - Shoulder Height Asymmetry
+- **Smart Ergonomic Metrics** (upper-body focus):
+  - **Forward Head Position** (✓ High accuracy) - Detects "tech neck" by measuring horizontal alignment of ears relative to shoulders
+  - **Neck Tilt** (✓ High accuracy) - Lateral head tilt detection via ear landmark analysis
+  - **Shoulder Height Asymmetry** (✓ Moderate accuracy) - Detects uneven shoulders and slouching
 - **Instant Visual Feedback**: Color-coded status and live metrics
 - **Native Desktop Notifications**: Gentle reminders when posture needs adjustment
 - **Auto-Calibration**: 2-second setup that adapts to your camera position
@@ -23,17 +22,12 @@ PosturePilot focuses on four key patterns that research links to musculoskeletal
    - Warning: >25% forward deviation
    - Risk: Neck strain, upper back pain, headaches
 
-2. **Rounded Shoulders**
-   - Ideal: Shoulders relaxed and back
-   - Warning: >15% change in shoulder width
-   - Risk: Upper back pain, shoulder impingement
-
-3. **Neck Tilt**
+2. **Neck Tilt**
    - Ideal: Ears level (±10% slope)
    - Warning: >10% lateral tilt
    - Risk: Muscle imbalance, cervical strain
 
-4. **Shoulder Asymmetry**
+3. **Shoulder Asymmetry**
    - Ideal: Level shoulders (±15% height difference)
    - Warning: >15% height disparity
    - Risk: Compensatory patterns, scoliosis risk
@@ -47,7 +41,6 @@ PosturePilot focuses on four key patterns that research links to musculoskeletal
 
 ### Metric Calculations
 - **Forward Head**: Horizontal distance from ear midpoint to shoulder line
-- **Shoulder Roundness**: Change in horizontal shoulder width
 - **Neck Tilt**: Slope between ear landmarks
 - **Shoulder Asymmetry**: Slope of shoulder line
 
@@ -55,6 +48,30 @@ PosturePilot focuses on four key patterns that research links to musculoskeletal
 1. Captures ~60 frames (2 seconds)
 2. Establishes shoulder width as scaling factor
 3. All measurements normalized to shoulder width for consistency
+
+## What PosturePilot Can & Cannot Measure
+
+PosturePilot uses **Human Pose Estimation** via webcam to analyze posture. Here's what's feasible:
+
+### ✅ **Highly Accurate** (What PosturePilot Monitors)
+- **Head Position**: Detects forward head posture ("tech neck") by analyzing ear-to-shoulder alignment
+- **Neck Tilt**: Measures lateral head tilt using ear landmark positions
+- **Shoulder Slouching**: Detects hunched or uneven shoulders
+
+### ⚠️ **Moderate Accuracy** (Limitations)
+- **Shoulder Roundness**: Can detect major slouching but struggles with subtle "pulling shoulders back" detection due to 2D camera limitations
+- **Spine Curvature**: Can infer major slouching but cannot accurately measure natural spinal curves (requires side-view or 3D depth sensing)
+
+### ❌ **Not Measurable** (Out of Scope)
+- **Pelvic Tilt**: Not visible from typical desk setup; requires specialized sensors
+- **Feet/Weight Distribution**: Feet not in frame; requires pressure sensors
+- **Full-Body Analysis**: Focused on upper-body desk posture only
+
+### Important Limitations
+- **2D vs. 3D**: Webcam captures 2D images with no true depth perception
+- **Camera Angle**: Best results when camera is directly in front at eye level
+- **Occlusion**: Arms, desk, or chair can block key body parts
+- **Clothing**: Baggy clothing may obscure joint positions
 
 ## Installation
 
@@ -110,3 +127,11 @@ MIT License - see LICENSE file for details.
 - Issues: GitHub issue tracker
 - Questions: Discussions board
 - Updates: Star/watch repository
+
+
+## Future Enhancements
+
+Potential features for future development:
+- Mouth breathing detection (requires additional facial landmark analysis)
+- Improved shoulder roundness detection (may require side-view camera or 3D depth sensing)
+- Posture trend analysis and reporting 
