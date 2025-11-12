@@ -5,52 +5,105 @@
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+    font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    background: #0a0a0a;
+    color: #ffffff;
     min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+    letter-spacing: -0.01em;
 }
 
 .container {
     padding: 20px;
-    max-width: 1000px;
+    max-width: 900px;
     margin: 0 auto;
 }
 
 header {
-    text-align: center;
-    margin-bottom: 30px;
+    text-align: left;
+    margin-bottom: 60px;
+    border-bottom: 1px solid #2a2a2a;
+    padding-bottom: 24px;
 }
 
 header h1 {
-    font-size: 2.5em;
-    margin-bottom: 10px;
-    font-weight: 300;
+    font-size: 32px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+    color: #ffffff;
 }
 
 header p {
-    opacity: 0.8;
-    font-size: 1.1em;
+    color: #888888;
+    font-size: 13px;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
 }
 
 .screen {
     display: none;
-    text-align: center;
 }
 
 .screen.active {
     display: block;
 }
 
+/* Monitor Layout - Side by Side */
+.monitor-layout {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
+
 .camera-container {
     position: relative;
     display: inline-block;
-    border-radius: 15px;
+    border-radius: 0;
     overflow: hidden;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-    margin: 20px 0;
-    background: #000;
-    min-height: 480px; /* Add minimum height */
+    background: #000000;
+    border: 1px solid #2a2a2a;
+    flex-shrink: 0;
+}
+
+#video, #monitor-video {
+    width: 400px;
+    height: 300px;
+    display: block;
+    object-fit: cover;
+}
+
+.overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 400px;
+    height: 300px;
+    pointer-events: none;
+}
+
+.monitor-sidebar {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+}
+
+.sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.pause-btn {
+    flex-shrink: 0;
+    padding: 8px 16px;
+    font-size: 11px;
+    margin: 0;
 }
 
 .loading-message,
@@ -59,24 +112,25 @@ header p {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    color: white;
-    font-size: 1.2em;
+    color: #ffffff;
+    font-size: 13px;
     text-align: center;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.9);
     padding: 20px;
-    border-radius: 10px;
+    border: 1px solid #2a2a2a;
     width: 80%;
     max-width: 400px;
+    font-weight: 400;
 }
 
 .error-message {
     color: #ff4444;
-    border: 1px solid #ff4444;
+    border-color: #ff4444;
 }
 
 .loading-message {
     color: #ffffff;
-    border: 1px solid #ffffff;
+    border-color: #2a2a2a;
     animation: pulse 1.5s infinite;
 }
 
@@ -86,109 +140,121 @@ header p {
     100% { opacity: 0.6; }
 }
 
-#video, #monitor-video {
-    width: 640px;
-    height: 480px;
-    display: block;
-}
-
-.overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 640px;
-    height: 480px;
-    pointer-events: none;
-}
-
-.setup-controls, .controls {
-    margin: 20px 0;
+.setup-controls {
+    margin: 20px 0 0 0;
+    text-align: left;
 }
 
 button {
-    background: rgba(255, 255, 255, 0.2);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    color: white;
+    background: #ffffff;
+    border: 1px solid #ffffff;
+    color: #000000;
     padding: 12px 24px;
-    margin: 0 10px;
-    border-radius: 25px;
-    font-size: 16px;
+    margin: 0 12px 0 0;
+    border-radius: 0;
+    font-size: 13px;
+    font-weight: 500;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-family: inherit;
 }
 
 button:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.3);
-    border-color: rgba(255, 255, 255, 0.5);
-    transform: translateY(-2px);
+    background: #f0f0f0;
+    border-color: #f0f0f0;
+}
+
+button:active:not(:disabled) {
+    background: #e0e0e0;
 }
 
 button:disabled {
-    opacity: 0.5;
+    opacity: 0.4;
     cursor: not-allowed;
 }
 
 .progress {
     margin: 20px 0;
-    font-size: 1.2em;
+    font-size: 13px;
     font-weight: 500;
 }
 
 .status {
-    margin: 20px 0;
+    margin: 0;
 }
 
 #posture-status {
-    font-size: 1.5em;
+    font-size: 13px;
     font-weight: 600;
-    padding: 15px 30px;
-    border-radius: 25px;
+    padding: 12px 16px;
+    border-radius: 0;
     display: inline-block;
-    margin-bottom: 15px;
+    margin-bottom: 8px;
+    border: 1px solid;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 .status-good {
-    background: rgba(76, 175, 80, 0.8);
+    background: #1a1a1a;
+    border-color: #4a4a4a;
+    color: #ffffff;
 }
 
 .status-warning {
-    background: rgba(255, 152, 0, 0.8);
+    background: #1a1a1a;
+    border-color: #ff8800;
+    color: #ff8800;
     animation: pulse 2s infinite;
 }
 
 .status-bad {
-    background: rgba(244, 67, 54, 0.8);
+    background: #1a1a1a;
+    border-color: #ff4444;
+    color: #ff4444;
     animation: pulse 1s infinite;
 }
 
 @keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
 }
 
 .next-check {
-    opacity: 0.8;
-    font-size: 1.1em;
+    color: #888888;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 500;
+    margin-top: 8px;
 }
 
 #countdown {
-    font-weight: bold;
+    font-weight: 600;
+    color: #ffffff;
 }
 
-/* Metrics panel */
+/* Metrics panel - Swiss Design */
 .metrics {
-    margin: 20px auto;
-    width: 300px;
-    background: rgba(255, 255, 255, 0.1);
-    padding: 15px 20px;
-    border-radius: 10px;
+    margin: 0;
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    padding: 16px;
     text-align: left;
 }
 
 .metrics h3 {
-    margin-bottom: 10px;
-    font-size: 1.1em;
+    margin-bottom: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #888888;
+    border-bottom: 1px solid #2a2a2a;
+    padding-bottom: 8px;
 }
 
 .metrics ul {
@@ -199,9 +265,58 @@ button:disabled {
 .metrics li {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 6px;
+    align-items: baseline;
+    margin-bottom: 12px;
+    font-size: 13px;
+    font-weight: 400;
+    color: #cccccc;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #2a2a2a;
+}
+
+.metrics li:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
 }
 
 .metrics li span {
     font-weight: 600;
+    color: #ffffff;
+    font-size: 16px;
+    letter-spacing: -0.01em;
+}
+
+.metrics li span::after {
+    content: '%';
+}
+
+.metrics-note {
+    margin-top: 12px;
+    font-size: 10px;
+    color: #666666;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    line-height: 1.6;
+    border-top: 1px solid #2a2a2a;
+    padding-top: 12px;
+}
+
+/* Setup Screen */
+#setup-screen h2 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    text-align: left;
+    letter-spacing: -0.02em;
+}
+
+#setup-screen p {
+    color: #888888;
+    font-size: 11px;
+    margin-bottom: 16px;
+    text-align: left;
+    line-height: 1.4;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
