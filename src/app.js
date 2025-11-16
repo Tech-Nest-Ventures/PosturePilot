@@ -15,6 +15,11 @@ class PosturePilot {
         this.isMonitoring = false;
         this.isInitializing = false;  // Add initialization state
         
+        // Throttle backend sync to avoid overwhelming the API
+        this.lastBackendSync = 0;
+        this.backendSyncInterval = 10000; // Send to backend every 10 seconds (instead of every frame)
+        this.lastPostureStatus = null; // Track last status to send on change
+        
         // Fixed ergonomic limits (units after scaling)
         this.POSTURE_LIMITS = {
             headForward: 0.25,      // horizontal ratio
@@ -23,7 +28,69 @@ class PosturePilot {
         };
         
         this.initializeElements();
+        this.eventsBound = false;
+        this.checkAuthAndInitialize();
+    }
+    
+    async checkAuthAndInitialize() {
+        // Wait for auth manager to initialize with timeout
+        const AUTH_MANAGER_TIMEOUT = 10000; // 10 seconds max wait
+        const POLL_INTERVAL = 100; // Check every 100ms
+        
+        await new Promise((resolve) => {
+            // If authManager already exists, resolve immediately
+            if (window.authManager) {
+                resolve();
+                return;
+            }
+            
+            let checkInterval;
+            let timeoutId;
+            
+            // Set up polling interval
+            checkInterval = setInterval(() => {
+                if (window.authManager) {
+                    clearInterval(checkInterval);
+                    clearTimeout(timeoutId);
+                    resolve();
+                }
+            }, POLL_INTERVAL);
+            
+            // Set up timeout to prevent infinite waiting
+            timeoutId = setTimeout(() => {
+                clearInterval(checkInterval);
+                console.warn('AuthManager initialization timeout - proceeding without authentication');
+                // Resolve instead of reject to allow app to continue
+                // User can still authenticate later
+                resolve();
+            }, AUTH_MANAGER_TIMEOUT);
+        });
+        
+        // Check if user is authenticated (guard against null authManager)
+        const isAuthenticated = window.authManager?.getIsAuthenticated() || false;
+        
+        if (!isAuthenticated) {
+            // Show auth screen - auth-ui.js will handle showing it
+            // Don't bind events yet, wait for authentication
+            // The auth screen is already shown by default in HTML
+            return;
+        }
+        
+        // User is authenticated, hide auth screen and show setup screen
+        if (window.authUI) {
+            window.authUI.hideAuthScreen();
+        } else {
+            // Fallback: manually show setup screen
+            this.setupScreen.classList.add('active');
+            const authScreen = document.getElementById('auth-screen');
+            if (authScreen) {
+                authScreen.classList.remove('active');
+            }
+        }
+        
+        // Proceed with app initialization
         this.bindEvents();
+        this.eventsBound = true;
     }
 
     initializeElements() {
@@ -370,12 +437,62 @@ class PosturePilot {
             });
         }
 
+        // Save posture log locally
         window.electronAPI.savePostureLog({
             timestamp: Date.now(),
             status,
             message,
             measurements: currentData
         });
+        
+        // If authenticated, also sync to backend (throttled)
+        if (window.authManager && window.authManager.getIsAuthenticated()) {
+            const now = Date.now();
+            const statusChanged = this.lastPostureStatus !== status;
+            const timeSinceLastSync = now - this.lastBackendSync;
+            
+            // Send to backend if:
+            // 1. Status changed (immediate sync for important changes)
+            // 2. OR enough time has passed (periodic sync)
+            if (statusChanged || timeSinceLastSync >= this.backendSyncInterval) {
+                // Calculate score and grade for backend
+                const score = this.calculatePostureScore(diffs);
+                const grade = this.calculatePostureGrade(score);
+                
+                // Format feedback message
+                let feedback = message;
+                if (status === 'good') {
+                    feedback = 'Good posture maintained';
+                } else if (status === 'warning') {
+                    feedback = `Warning: ${message}. Please adjust your posture.`;
+                } else {
+                    feedback = `Poor posture detected: ${message}. Please sit up straight.`;
+                }
+                
+                // Determine posture type description
+                let postureType = 'good posture';
+                if (status === 'bad') {
+                    postureType = 'poor posture';
+                } else if (status === 'warning') {
+                    postureType = 'suboptimal posture';
+                }
+                
+                // Send to backend (async, don't block)
+                // API expects: posture, grade, score, feedback
+                window.authManager.sendPostureData({
+                    posture: postureType,
+                    grade: grade,
+                    score: Math.round(score * 10) / 10, // Round to 1 decimal place
+                    feedback: feedback
+                }).catch(error => {
+                    console.error('Failed to sync posture data to backend:', error);
+                });
+                
+                // Update tracking
+                this.lastBackendSync = now;
+                this.lastPostureStatus = status;
+            }
+        }
     }
 
     updatePostureStatus(status, message) {
@@ -644,6 +761,45 @@ class PosturePilot {
         const dy = nose.y - neck.y;
         return Math.atan2(dy, dx) * (180 / Math.PI);
     }
+    
+    calculatePostureScore(diffs) {
+        // Calculate a score from 0-100 based on how close to limits
+        let score = 100;
+        
+        // Head forward penalty
+        const headForwardPct = (diffs.normForward / this.POSTURE_LIMITS.headForward) * 100;
+        if (headForwardPct > 100) {
+            score -= Math.min(40, (headForwardPct - 100) * 0.4);
+        } else if (headForwardPct > 80) {
+            score -= (headForwardPct - 80) * 0.2;
+        }
+        
+        // Neck tilt penalty
+        const neckTiltPct = (diffs.neckTiltAbs / this.POSTURE_LIMITS.neckTilt) * 100;
+        if (neckTiltPct > 100) {
+            score -= Math.min(30, (neckTiltPct - 100) * 0.3);
+        } else if (neckTiltPct > 80) {
+            score -= (neckTiltPct - 80) * 0.15;
+        }
+        
+        // Shoulder slope penalty
+        const shoulderSlopePct = (diffs.shoulderSlopeAbs / this.POSTURE_LIMITS.shoulderSlope) * 100;
+        if (shoulderSlopePct > 100) {
+            score -= Math.min(30, (shoulderSlopePct - 100) * 0.3);
+        } else if (shoulderSlopePct > 80) {
+            score -= (shoulderSlopePct - 80) * 0.15;
+        }
+        
+        return Math.max(0, Math.min(100, score));
+    }
+    
+    calculatePostureGrade(score) {
+        if (score >= 90) return 'A';
+        if (score >= 80) return 'B';
+        if (score >= 70) return 'C';
+        if (score >= 60) return 'D';
+        return 'F';
+    }
 
     // Manual setup finish removed - app now uses automatic calibration
     // This method is kept for backward compatibility but should not be called
@@ -674,5 +830,5 @@ class PosturePilot {
 
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    new PosturePilot();
+    window.posturePilot = new PosturePilot();
 });

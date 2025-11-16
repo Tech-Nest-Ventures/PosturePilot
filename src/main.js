@@ -203,6 +203,7 @@ app.on('activate', () => {
 const getDataPath = () => path.join(app.getPath('userData'), 'posture-data');
 const getBaselinePath = () => path.join(getDataPath(), 'baseline.json');
 const getLogsPath = () => path.join(getDataPath(), 'posture-logs.json');
+const getAuthTokenPath = () => path.join(app.getPath('userData'), 'auth-token.json');
 
 // Ensure data directory exists
 const ensureDataDirectory = async () => {
@@ -322,5 +323,44 @@ ipcMain.handle('update-tray-icon', async (event, status) => {
   } catch (error) {
     console.error('Failed to update tray icon:', error);
     return { success: false, error: error.message };
+  }
+});
+
+// IPC handlers for authentication token storage
+ipcMain.handle('set-auth-token', async (event, token) => {
+  try {
+    const tokenData = { token, timestamp: Date.now() };
+    await fs.writeFile(getAuthTokenPath(), JSON.stringify(tokenData, null, 2));
+    console.log('Auth token saved successfully');
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to save auth token:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-auth-token', async () => {
+  try {
+    const data = await fs.readFile(getAuthTokenPath(), 'utf8');
+    const tokenData = JSON.parse(data);
+    return tokenData.token;
+  } catch (error) {
+    console.log('No auth token found or error reading:', error.message);
+    return null;
+  }
+});
+
+ipcMain.handle('remove-auth-token', async () => {
+  try {
+    await fs.unlink(getAuthTokenPath());
+    console.log('Auth token removed successfully');
+    return { success: true };
+  } catch (error) {
+    // File might not exist, which is fine
+    if (error.code !== 'ENOENT') {
+      console.error('Failed to remove auth token:', error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
   }
 });
