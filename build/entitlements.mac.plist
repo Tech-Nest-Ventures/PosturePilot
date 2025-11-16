@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Hardened Runtime entitlements for non-MAS builds -->
+  
+  <!-- Camera access -->
+  <key>com.apple.security.device.camera</key>
+  <true/>
+  
+  <!-- Microphone access (required for some camera APIs) -->
+  <key>com.apple.security.device.microphone</key>
+  <true/>
+  
+  <!-- Network access for backend API -->
+  <key>com.apple.security.network.client</key>
+  <true/>
+  
+  <!-- File access for posture logs -->
+  <key>com.apple.security.files.user-selected.read-write</key>
+  <true/>
+  
+  <!-- Allow JIT compilation (needed for MediaPipe) -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  
+  <!-- Allow unsigned executable memory (needed for MediaPipe) -->
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+  
+  <!-- Disable library validation (needed for some Electron frameworks) -->
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+</dict>
+</plist>
+

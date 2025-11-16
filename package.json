@@ -8,7 +8,9 @@
     "dev": "electron . --enable-logging",
     "build": "electron-builder",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder --publish=never",
+    "dist": "electron-builder --mac --publish=never",
+    "dist:mac": "electron-builder --mac dmg --publish=never",
+    "dist:mac:zip": "electron-builder --mac zip --publish=never",
     "build:mas": "electron-builder --mac mas",
     "build:mas:dir": "electron-builder --mac mas --dir",
     "dist:mas": "electron-builder --mac mas --publish=never",
@@ -40,7 +42,14 @@
     },
     "files": [
       "src/**/*",
-      "package.json"
+      "package.json",
+      "src/Info.plist"
+    ],
+    "extraResources": [
+      {
+        "from": "src/Info.plist",
+        "to": "Info.plist"
+      }
     ],
     "mac": {
       "category": "public.app-category.healthcare-fitness",
@@ -50,10 +59,16 @@
         "NSCameraUseContinuityCameraDeviceType": true,
         "NSMicrophoneUsageDescription": "PosturePilot does not use the microphone but some camera APIs require this permission"
       },
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
       "target": [
         {
-          "target": "mas",
-          "arch": ["arm64"]
+          "target": "dmg",
+          "arch": ["arm64", "x64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["arm64", "x64"]
         }
       ],
       "hardenedRuntime": true,
