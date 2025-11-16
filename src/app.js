@@ -301,6 +301,33 @@ class PosturePilot {
         // Start video playing
         await this.video.play();
         
+        // Keep video playing even when window is minimized/hidden
+        // Handle Page Visibility API to prevent video pausing
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                // Window is hidden/minimized - keep video playing
+                if (this.video && this.video.paused) {
+                    console.log('Window hidden, keeping video playing...');
+                    this.video.play().catch(err => {
+                        console.error('Error keeping video playing when hidden:', err);
+                    });
+                }
+            }
+        });
+        
+        // Also handle when video tries to pause
+        this.video.addEventListener('pause', (e) => {
+            // If video pauses due to visibility, resume it
+            if (document.hidden || document.visibilityState === 'hidden') {
+                console.log('Video paused due to visibility, resuming...');
+                setTimeout(() => {
+                    this.video.play().catch(err => {
+                        console.error('Error resuming video:', err);
+                    });
+                }, 100);
+            }
+        });
+        
         // Initialize camera with continuous frame sending
         this.camera = new Camera(this.video, {
             onFrame: async () => {
