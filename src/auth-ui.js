@@ -97,7 +97,8 @@ class AuthUI {
             const result = await window.authManager.login(username, password);
             
             if (result.success) {
-                // Successfully logged in
+                // Successfully logged in - hide auth screen
+                console.log('Login successful, hiding auth screen');
                 this.hideAuthScreen();
             } else {
                 this.showError('login', result.error || 'Login failed. Please try again.');
@@ -139,7 +140,8 @@ class AuthUI {
             const result = await window.authManager.signup(username, password);
             
             if (result.success) {
-                // Successfully signed up
+                // Successfully signed up - hide auth screen
+                console.log('Signup successful, hiding auth screen');
                 this.hideAuthScreen();
             } else {
                 this.showError('signup', result.error || 'Signup failed. Please try again.');
@@ -158,17 +160,55 @@ class AuthUI {
     }
 
     hideAuthScreen() {
-        this.authScreen.classList.remove('active');
-        this.setupScreen.classList.add('active');
+        // Re-fetch elements in case they weren't available during initialization
+        const authScreen = document.getElementById('auth-screen');
+        const setupScreen = document.getElementById('setup-screen');
+        const monitorScreen = document.getElementById('monitor-screen');
         
-        // Initialize the PosturePilot app if it exists
-        if (window.posturePilot) {
-            // Bind events if not already bound
-            if (!window.posturePilot.eventsBound) {
-                window.posturePilot.bindEvents();
-                window.posturePilot.eventsBound = true;
+        // Use requestAnimationFrame to ensure DOM is ready
+        requestAnimationFrame(() => {
+            // Ensure auth screen is hidden - use CSS classes
+            if (authScreen) {
+                authScreen.classList.remove('active');
             }
-        }
+            
+            // Show setup screen - use CSS classes
+            if (setupScreen) {
+                setupScreen.classList.add('active');
+            }
+            
+            // Ensure monitor screen is hidden
+            if (monitorScreen) {
+                monitorScreen.classList.remove('active');
+            }
+            
+            // Update our references
+            this.authScreen = authScreen;
+            this.setupScreen = setupScreen;
+            this.monitorScreen = monitorScreen;
+            
+            // Initialize the PosturePilot app if it exists
+            if (window.posturePilot) {
+                // Bind events if not already bound
+                if (!window.posturePilot.eventsBound) {
+                    window.posturePilot.bindEvents();
+                    window.posturePilot.eventsBound = true;
+                }
+                
+                // Verify video elements are accessible
+                const video = document.getElementById('video');
+                const cameraContainer = setupScreen?.querySelector('.camera-container');
+                const startCameraBtn = document.getElementById('start-camera-btn');
+                
+                console.log('Auth screen hidden, setup screen shown');
+                console.log('Setup screen active class:', setupScreen?.classList.contains('active'));
+                console.log('Auth screen active class:', authScreen?.classList.contains('active'));
+                console.log('Video element found:', !!video);
+                console.log('Camera container found:', !!cameraContainer);
+                console.log('Start camera button found:', !!startCameraBtn);
+                console.log('Setup screen display style:', window.getComputedStyle(setupScreen).display);
+            }
+        });
     }
 
     showAuthScreen() {

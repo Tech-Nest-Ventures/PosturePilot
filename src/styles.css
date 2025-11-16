@@ -322,7 +322,8 @@ button:disabled {
 }
 
 /* Authentication Screen */
-#auth-screen {
+/* Base state is hidden via .screen class */
+#auth-screen.active {
     display: flex;
     align-items: center;
     justify-content: center;

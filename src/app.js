@@ -15,6 +15,11 @@ class PosturePilot {
         this.isMonitoring = false;
         this.isInitializing = false;  // Add initialization state
         
+        // Throttle backend sync to avoid overwhelming the API
+        this.lastBackendSync = 0;
+        this.backendSyncInterval = 10000; // Send to backend every 10 seconds (instead of every frame)
+        this.lastPostureStatus = null; // Track last status to send on change
+        
         // Fixed ergonomic limits (units after scaling)
         this.POSTURE_LIMITS = {
             headForward: 0.25,      // horizontal ratio
@@ -421,40 +426,53 @@ class PosturePilot {
             measurements: currentData
         });
         
-        // If authenticated, also sync to backend
+        // If authenticated, also sync to backend (throttled)
         if (window.authManager && window.authManager.getIsAuthenticated()) {
-            // Calculate score and grade for backend
-            const score = this.calculatePostureScore(diffs);
-            const grade = this.calculatePostureGrade(score);
+            const now = Date.now();
+            const statusChanged = this.lastPostureStatus !== status;
+            const timeSinceLastSync = now - this.lastBackendSync;
             
-            // Format feedback message
-            let feedback = message;
-            if (status === 'good') {
-                feedback = 'Good posture maintained';
-            } else if (status === 'warning') {
-                feedback = `Warning: ${message}. Please adjust your posture.`;
-            } else {
-                feedback = `Poor posture detected: ${message}. Please sit up straight.`;
+            // Send to backend if:
+            // 1. Status changed (immediate sync for important changes)
+            // 2. OR enough time has passed (periodic sync)
+            if (statusChanged || timeSinceLastSync >= this.backendSyncInterval) {
+                // Calculate score and grade for backend
+                const score = this.calculatePostureScore(diffs);
+                const grade = this.calculatePostureGrade(score);
+                
+                // Format feedback message
+                let feedback = message;
+                if (status === 'good') {
+                    feedback = 'Good posture maintained';
+                } else if (status === 'warning') {
+                    feedback = `Warning: ${message}. Please adjust your posture.`;
+                } else {
+                    feedback = `Poor posture detected: ${message}. Please sit up straight.`;
+                }
+                
+                // Determine posture type description
+                let postureType = 'good posture';
+                if (status === 'bad') {
+                    postureType = 'poor posture';
+                } else if (status === 'warning') {
+                    postureType = 'suboptimal posture';
+                }
+                
+                // Send to backend (async, don't block)
+                // API expects: posture, grade, score, feedback
+                window.authManager.sendPostureData({
+                    posture: postureType,
+                    grade: grade,
+                    score: Math.round(score * 10) / 10, // Round to 1 decimal place
+                    feedback: feedback
+                }).catch(error => {
+                    console.error('Failed to sync posture data to backend:', error);
+                });
+                
+                // Update tracking
+                this.lastBackendSync = now;
+                this.lastPostureStatus = status;
             }
-            
-            // Determine posture type description
-            let postureType = 'good posture';
-            if (status === 'bad') {
-                postureType = 'poor posture';
-            } else if (status === 'warning') {
-                postureType = 'suboptimal posture';
-            }
-            
-            // Send to backend (async, don't block)
-            // API expects: posture, grade, score, feedback
-            window.authManager.sendPostureData({
-                posture: postureType,
-                grade: grade,
-                score: Math.round(score * 10) / 10, // Round to 1 decimal place
-                feedback: feedback
-            }).catch(error => {
-                console.error('Failed to sync posture data to backend:', error);
-            });
         }
     }
 
