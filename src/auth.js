@@ -1,0 +1,242 @@
+// Authentication module for PosturePilot
+// Handles login, signup, token management, and API communication
+
+class AuthManager {
+    constructor() {
+        // API base URL - can be configured via window.API_BASE_URL or defaults to production
+        // To configure, set window.API_BASE_URL before auth.js loads
+        this.apiBaseUrl = window.API_BASE_URL || 'https://backend-production-5eec.up.railway.app/api/v1';
+        this.token = null;
+        this.user = null;
+        this.isAuthenticated = false;
+        
+        // Initialize on load
+        this.init();
+    }
+
+    async init() {
+        // Load stored token on initialization
+        try {
+            const storedToken = await window.electronAPI.getAuthToken();
+            if (storedToken) {
+                this.token = storedToken;
+                this.isAuthenticated = true;
+                // Optionally verify token is still valid
+                await this.verifyToken();
+            }
+        } catch (error) {
+            console.error('Error loading auth token:', error);
+        }
+    }
+
+    async login(username, password) {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/auth/login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ username, password }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                // API returns error in 'message' field for 400 errors
+                throw new Error(data.message || data.error || 'Login failed');
+            }
+
+            if (data.token) {
+                this.token = data.token;
+                this.user = data.user || { username };
+                this.isAuthenticated = true;
+                
+                // Store token securely
+                await window.electronAPI.setAuthToken(this.token);
+                
+                return { success: true, user: this.user };
+            } else {
+                throw new Error('No token received from server');
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async signup(username, password) {
+        try {
+            // Check if signup endpoint exists - if not, return error
+            const response = await fetch(`${this.apiBaseUrl}/auth/signup`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ username, password }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                // API returns error in 'message' field for 400 errors
+                throw new Error(data.message || data.error || 'Signup failed');
+            }
+
+            if (data.token) {
+                this.token = data.token;
+                this.user = data.user || { username };
+                this.isAuthenticated = true;
+                
+                // Store token securely
+                await window.electronAPI.setAuthToken(this.token);
+                
+                return { success: true, user: this.user };
+            } else {
+                throw new Error('No token received from server');
+            }
+        } catch (error) {
+            console.error('Signup error:', error);
+            // If endpoint doesn't exist (404), provide helpful message
+            if (error.message.includes('404') || error.message.includes('Not Found')) {
+                return { success: false, error: 'Signup endpoint not available. Please contact support to create an account.' };
+            }
+            return { success: false, error: error.message };
+        }
+    }
+
+    async logout() {
+        this.token = null;
+        this.user = null;
+        this.isAuthenticated = false;
+        
+        // Remove stored token
+        await window.electronAPI.removeAuthToken();
+    }
+
+    async verifyToken() {
+        if (!this.token) {
+            this.isAuthenticated = false;
+            return false;
+        }
+
+        // Try to verify token by making a lightweight API call
+        // If verify endpoint doesn't exist, we'll test with posture stats endpoint
+        try {
+            // Try using posture stats as a token verification method
+            const response = await fetch(`${this.apiBaseUrl}/posture/stats?days=1`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                },
+            });
+
+            if (!response.ok) {
+                // Token is invalid (401 or 403)
+                if (response.status === 401 || response.status === 403) {
+                    await this.logout();
+                    return false;
+                }
+                // Other errors might be server issues, keep token but mark as unverified
+                return false;
+            }
+
+            // Token is valid
+            this.isAuthenticated = true;
+            return true;
+        } catch (error) {
+            console.error('Token verification error:', error);
+            // On network errors, keep the token but don't mark as verified
+            // This allows offline usage
+            return false;
+        }
+    }
+
+    getAuthHeaders() {
+        if (!this.token) {
+            return {};
+        }
+        return {
+            'Authorization': `Bearer ${this.token}`,
+            'Content-Type': 'application/json',
+        };
+    }
+
+    async sendPostureData(postureData) {
+        if (!this.isAuthenticated || !this.token) {
+            console.log('Not authenticated, skipping posture data sync');
+            return { success: false, error: 'Not authenticated' };
+        }
+
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/posture`, {
+                method: 'POST',
+                headers: this.getAuthHeaders(),
+                body: JSON.stringify(postureData),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                // If token is invalid, logout
+                if (response.status === 401 || response.status === 403) {
+                    await this.logout();
+                }
+                // API returns error in 'message' or 'error' field
+                throw new Error(data.message || data.error || 'Failed to save posture data');
+            }
+
+            return { success: true, data };
+        } catch (error) {
+            console.error('Error sending posture data:', error);
+            return { success: false, error: error.message };
+        }
+    }
+    
+    async getPostureStats(days = 1) {
+        if (!this.isAuthenticated || !this.token) {
+            console.log('Not authenticated, cannot fetch stats');
+            return { success: false, error: 'Not authenticated' };
+        }
+
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/posture/stats?days=${days}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                },
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                // If token is invalid, logout
+                if (response.status === 401 || response.status === 403) {
+                    await this.logout();
+                }
+                throw new Error(data.error || 'Failed to fetch posture statistics');
+            }
+
+            return { success: true, data };
+        } catch (error) {
+            console.error('Error fetching posture stats:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    getToken() {
+        return this.token;
+    }
+
+    getUser() {
+        return this.user;
+    }
+
+    getIsAuthenticated() {
+        return this.isAuthenticated;
+    }
+}
+
+// Export singleton instance
+const authManager = new AuthManager();
+window.authManager = authManager;
+

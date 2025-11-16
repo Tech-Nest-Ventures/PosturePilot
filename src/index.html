@@ -9,8 +9,66 @@
 <body>
     <div class="container">
         <main>
+            <!-- Authentication Screen -->
+            <div id="auth-screen" class="screen active">
+                <div class="auth-container">
+                    <h2>PosturePilot</h2>
+                    <p class="auth-subtitle">Sign in to sync your data across devices and receive daily posture reports</p>
+                    
+                    <!-- Login Form -->
+                    <div id="login-form" class="auth-form active">
+                        <h3>Sign In</h3>
+                        <form id="login-form-element">
+                            <div class="form-group">
+                                <label for="login-email">Email</label>
+                                <input type="email" id="login-email" name="email" required autocomplete="email">
+                            </div>
+                            <div class="form-group">
+                                <label for="login-password">Password</label>
+                                <input type="password" id="login-password" name="password" required autocomplete="current-password">
+                            </div>
+                            <div id="login-error" class="error-message" style="display: none;"></div>
+                            <button type="submit" id="login-submit-btn" class="auth-submit-btn">Sign In</button>
+                        </form>
+                        <p class="auth-switch">
+                            Don't have an account? <a href="#" id="switch-to-signup">Sign Up</a>
+                        </p>
+                        <p class="auth-skip">
+                            <a href="#" id="skip-auth">Continue without account</a>
+                        </p>
+                    </div>
+                    
+                    <!-- Signup Form -->
+                    <div id="signup-form" class="auth-form">
+                        <h3>Sign Up</h3>
+                        <form id="signup-form-element">
+                            <div class="form-group">
+                                <label for="signup-email">Email</label>
+                                <input type="email" id="signup-email" name="email" required autocomplete="email">
+                            </div>
+                            <div class="form-group">
+                                <label for="signup-password">Password</label>
+                                <input type="password" id="signup-password" name="password" required autocomplete="new-password" minlength="6">
+                            </div>
+                            <div class="form-group">
+                                <label for="signup-confirm-password">Confirm Password</label>
+                                <input type="password" id="signup-confirm-password" name="confirmPassword" required autocomplete="new-password">
+                            </div>
+                            <div id="signup-error" class="error-message" style="display: none;"></div>
+                            <button type="submit" id="signup-submit-btn" class="auth-submit-btn">Sign Up</button>
+                        </form>
+                        <p class="auth-switch">
+                            Already have an account? <a href="#" id="switch-to-login">Sign In</a>
+                        </p>
+                        <p class="auth-skip">
+                            <a href="#" id="skip-auth-signup">Continue without account</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
             <!-- Setup Phase -->
-            <div id="setup-screen" class="screen active">
+            <div id="setup-screen" class="screen">
                 <h2>Initial Setup</h2>
                 <p>Sit up straight with your shoulders back.</p>
                 <div class="camera-container">
@@ -57,6 +115,8 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+    <script src="auth.js"></script>
+    <script src="auth-ui.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
