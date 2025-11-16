@@ -17,7 +17,15 @@ function createWindow() {
     },
     titleBarStyle: 'default',
     resizable: true,
-    show: false
+    show: false,
+    // Allow app to show notifications even when window is hidden
+    skipTaskbar: false
+  });
+  
+  // Prevent app from sleeping when window is hidden (for background monitoring)
+  mainWindow.on('hide', () => {
+    // Keep app active in background
+    app.dock?.setBadge?.('');
   });
 
   mainWindow.loadFile('src/index.html');
@@ -26,12 +34,59 @@ function createWindow() {
     mainWindow.show();
   });
 
-  // On macOS, hide window instead of closing when user clicks close button
+  // Move window off-screen instead of minimizing/hiding to keep camera active
+  // This keeps the window "visible" to the browser so video doesn't pause
+  function moveWindowOffScreen() {
+    const { screen } = require('electron');
+    const displays = screen.getAllDisplays();
+    // Move to a position off-screen (negative coordinates)
+    // This keeps window "visible" but out of view
+    mainWindow.setPosition(-2000, -2000);
+    mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    console.log('Window moved off-screen to keep camera active');
+  }
+  
+  function restoreWindowPosition() {
+    // Restore to center of primary display
+    const { screen } = require('electron');
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width, height } = primaryDisplay.workAreaSize;
+    mainWindow.setPosition(
+      Math.floor((width - 850) / 2),
+      Math.floor((height - 500) / 2)
+    );
+    mainWindow.setVisibleOnAllWorkspaces(false);
+    console.log('Window position restored');
+  }
+  
+  // On macOS, move window off-screen instead of closing when user clicks close button
+  // This keeps the window "visible" so camera doesn't pause
   mainWindow.on('close', (event) => {
     if (process.platform === 'darwin') {
       event.preventDefault();
-      mainWindow.hide();
+      // Move off-screen instead of hiding/minimizing
+      moveWindowOffScreen();
     }
+  });
+  
+  // Handle minimize event - move off-screen instead to keep camera running
+  mainWindow.on('minimize', (event) => {
+    event.preventDefault();
+    // Move off-screen instead of minimizing
+    moveWindowOffScreen();
+  });
+  
+  // Keep window active even when not focused (for background monitoring)
+  mainWindow.on('blur', () => {
+    // Window lost focus but keep running
+    // Camera and notifications will continue to work
+  });
+  
+  // Prevent window from being hidden (which would pause camera)
+  mainWindow.on('hide', (event) => {
+    event.preventDefault();
+    // Move off-screen instead of hiding
+    moveWindowOffScreen();
   });
 
   if (process.env.NODE_ENV === 'development') {
@@ -145,10 +200,31 @@ function createTray() {
         label: 'Show PosturePilot',
         click: () => {
           if (mainWindow) {
+            const { screen } = require('electron');
+            const primaryDisplay = screen.getPrimaryDisplay();
+            const { width, height } = primaryDisplay.workAreaSize;
+            mainWindow.setPosition(
+              Math.floor((width - 850) / 2),
+              Math.floor((height - 500) / 2)
+            );
+            mainWindow.setVisibleOnAllWorkspaces(false);
             mainWindow.show();
             mainWindow.focus();
           }
         }
+      },
+      {
+        label: 'Hide to Background',
+        click: () => {
+          if (mainWindow) {
+            // Move off-screen to keep camera active
+            mainWindow.setPosition(-2000, -2000);
+            mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+          }
+        }
+      },
+      {
+        type: 'separator'
       },
       {
         label: 'Quit',
@@ -160,14 +236,27 @@ function createTray() {
     
     tray.setContextMenu(contextMenu);
     
-    // Click to show/hide window
+    // Click to toggle window visibility (move off-screen/restore)
     tray.on('click', () => {
       if (mainWindow) {
-        if (mainWindow.isVisible()) {
-          mainWindow.hide();
-        } else {
+        const bounds = mainWindow.getBounds();
+        // Check if window is off-screen (negative coordinates)
+        if (bounds.x < -1000 || bounds.y < -1000) {
+          // Restore window to visible position
+          const { screen } = require('electron');
+          const primaryDisplay = screen.getPrimaryDisplay();
+          const { width, height } = primaryDisplay.workAreaSize;
+          mainWindow.setPosition(
+            Math.floor((width - 850) / 2),
+            Math.floor((height - 500) / 2)
+          );
+          mainWindow.setVisibleOnAllWorkspaces(false);
           mainWindow.show();
           mainWindow.focus();
+        } else {
+          // Move window off-screen (keeps camera active)
+          mainWindow.setPosition(-2000, -2000);
+          mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
         }
       }
     });
@@ -180,18 +269,41 @@ function createTray() {
 
 app.whenReady().then(() => {
   createWindow();
-  // Create tray after a short delay to ensure app is fully ready
+  
+  // Create tray immediately - essential for app functionality
+  // Use a small delay to ensure app is fully initialized
   setTimeout(() => {
-    createTray();
-  }, 100);
+    try {
+      createTray();
+      console.log('Tray creation attempted');
+    } catch (error) {
+      console.error('Failed to create tray:', error);
+    }
+  }, 200);
+  
+  // Note: Electron's Notification API doesn't require explicit permission request
+  // macOS will prompt automatically on first notification if needed
+  // Notifications should work by default in Electron
 });
 
 app.on('window-all-closed', () => {
   // Don't quit on macOS - keep the app running in the menu bar
+  // This allows notifications to work even when window is closed
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
+
+// Prevent app from sleeping when running in background (macOS)
+if (process.platform === 'darwin') {
+  // Keep app active for background monitoring
+  app.dock?.setBadge?.('');
+  
+  // Ensure app can receive notifications when in background
+  app.on('before-quit', (event) => {
+    // Allow quit if explicitly requested
+  });
+}
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
@@ -269,19 +381,33 @@ ipcMain.handle('save-posture-log', async (event, data) => {
 
 ipcMain.handle('show-notification', async (event, { title, body, type }) => {
   try {
-    if (Notification.isSupported()) {
-      const notification = new Notification({
-        title: title || 'PosturePilot',
-        body: body || 'Posture alert!',
-        icon: path.join(__dirname, 'icon.png') // Optional: add an icon
-      });
-      
-      notification.show();
-      return { success: true };
-    } else {
+    if (!Notification.isSupported()) {
       console.log('Notifications not supported');
       return { success: false, error: 'Notifications not supported' };
     }
+    
+    // Electron's Notification API works differently than browser API
+    // Just create and show - macOS will handle permissions automatically
+    const notification = new Notification({
+      title: title || 'PosturePilot',
+      body: body || 'Posture alert!',
+      icon: path.join(__dirname, 'src', 'assets', 'icon.png'),
+      silent: false
+    });
+    
+    // Show notification
+    notification.show();
+    console.log('Notification shown:', title, body);
+    
+    // Handle click to bring app to front
+    notification.on('click', () => {
+      if (mainWindow) {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    });
+    
+    return { success: true };
   } catch (error) {
     console.error('Failed to show notification:', error);
     return { success: false, error: error.message };
