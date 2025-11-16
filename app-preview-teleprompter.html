@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PosturePilot - App Preview Teleprompter</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background: #0a0a0a;
+            color: #ffffff;
+            padding: 40px;
+            line-height: 1.8;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            color: #ffffff;
+        }
+
+        .preview-selector {
+            margin-bottom: 30px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .preview-btn {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            color: #ffffff;
+            padding: 12px 24px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .preview-btn:hover {
+            background: #2a2a2a;
+            border-color: #4a4a4a;
+        }
+
+        .preview-btn.active {
+            background: #ffffff;
+            color: #000000;
+            border-color: #ffffff;
+        }
+
+        .preview-content {
+            display: none;
+        }
+
+        .preview-content.active {
+            display: block;
+        }
+
+        .timeline {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        .timeline-item {
+            margin-bottom: 30px;
+            padding-bottom: 30px;
+            border-bottom: 1px solid #2a2a2a;
+        }
+
+        .timeline-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .time {
+            font-size: 18px;
+            font-weight: 600;
+            color: #4a4a4a;
+            margin-bottom: 8px;
+        }
+
+        .action {
+            font-size: 16px;
+            color: #ffffff;
+            margin-bottom: 8px;
+        }
+
+        .visual-focus {
+            font-size: 14px;
+            color: #888888;
+            margin-bottom: 8px;
+            font-style: italic;
+        }
+
+        .text-overlay {
+            font-size: 14px;
+            color: #ff8800;
+            background: #1a1a1a;
+            padding: 8px 12px;
+            display: inline-block;
+            border-left: 3px solid #ff8800;
+        }
+
+        .key-moments {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .key-moments h3 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #ffffff;
+        }
+
+        .key-moments ul {
+            list-style: none;
+        }
+
+        .key-moments li {
+            padding: 8px 0;
+            padding-left: 25px;
+            position: relative;
+            color: #cccccc;
+        }
+
+        .key-moments li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #4a4a4a;
+        }
+
+        .timer {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            padding: 15px 25px;
+            font-size: 24px;
+            font-weight: 600;
+            color: #ffffff;
+            border-radius: 0;
+        }
+
+        .timer.running {
+            color: #ff8800;
+            border-color: #ff8800;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .control-btn {
+            background: #ffffff;
+            border: 1px solid #ffffff;
+            color: #000000;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .control-btn:hover {
+            background: #f0f0f0;
+        }
+
+        .control-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="timer" id="timer">00:00</div>
+    
+    <div class="container">
+        <h1>PosturePilot App Preview Teleprompter</h1>
+        
+        <div class="preview-selector">
+            <button class="preview-btn active" onclick="showPreview(1)">Preview 1: Quick Setup</button>
+            <button class="preview-btn" onclick="showPreview(2)">Preview 2: Privacy & Metrics</button>
+            <button class="preview-btn" onclick="showPreview(3)">Preview 3: For Desk Workers</button>
+        </div>
+
+        <div class="controls">
+            <button class="control-btn" onclick="startTimer()">Start Timer</button>
+            <button class="control-btn" onclick="stopTimer()">Stop Timer</button>
+            <button class="control-btn" onclick="resetTimer()">Reset</button>
+        </div>
+
+        <!-- Preview 1 -->
+        <div class="preview-content active" id="preview-1">
+            <div class="timeline">
+                <div class="timeline-item">
+                    <div class="time">0:00 - 0:03</div>
+                    <div class="action">Opening shot: App window with setup screen</div>
+                    <div class="visual-focus">Dark theme, "PosturePilot" visible</div>
+                    <div class="text-overlay">"AI-Powered Posture Monitoring"</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="time">0:03 - 0:08</div>
+                    <div class="action">Click "Start Camera" button</div>
+                    <div class="visual-focus">Smooth click, camera view appears</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="time">0:08 - 0:12</div>
+                    <div class="action">Auto-calibration phase (2 seconds)</div>
+                    <div class="visual-focus">Show "CAL" status, pose skeleton visible</div>
+                    <div class="text-overlay">"2-Second Auto-Calibration"</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="time">0:12 - 0:20</div>
+                    <div class="action">Monitoring mode active</div>
+                    <div class="visual-focus">Live video feed, "Good Posture" (green), metrics panel</div>
+                    <div class="text-overlay">"Real-Time Posture Analysis"</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="time">0:20 - 0:26</div>
+                    <div class="action">Demonstrate bad posture detection</div>
+                    <div class="visual-focus">Person slouches, status changes to "Warning" (yellow), metrics increase</div>
+                    <div class="text-overlay">"Instant Alerts When Posture Needs Adjustment"</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="time">0:26 - 0:30</div>
+                    <div class="action">Closing shot</div>
+                    <div class="visual-focus">Status returns to "Good Posture" (green)</div>
+                    <div class="text-overlay">"Maintain Healthy Posture All Day"</div>
+                </div>
+            </div>
+            <div class="key-moments">
+                <h3>Key Moments to Capture:</h3>
+                <ul>
+                    <li>Smooth camera initialization</li>
+                    <li>Pose detection overlay appearing</li>
+                    <li>Status changing from good → warning → good</li>
+                    <li>Metrics updating in real-time</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Preview 2 -->
+        <div class="preview-content" id="preview-2">
+            <div class="timeline">
+                <div class="timeline-item">
+                    <div class="time">0:00 - 0:05</div>
+                    <div class="action">Opening: App in monitoring mode</div>
+                    <div class="text-overlay">"All Processing Happens Locally"</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="time">0:05 - 0:12</div>
+                    <div class="action">Show metrics panel in detail</div>
+                    <div class="visual-focus">Highlight each metric: Head Forward, Neck Tilt, Shoulder Slope</div>
+                    <div class="text-overlay">"Three Key Ergonomic Metrics"</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="time">0:12 - 0:20</div>
+                    <div class="action">Demonstrate different posture issues</div>
+                    <div class="visual-focus">Neck tilt, shoulder asymmetry, status indicators change</div>
+                    <div class="text-overlay">"Detects Forward Head, Neck Tilt, Shoulder Asymmetry"</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="time">0:20 - 0:25</div>
+                    <div class="action">Show notification (if possible)</div>
+                    <div class="visual-focus">Desktop notification appears</div>
+                    <div class="text-overlay">"Gentle Reminders Throughout Your Day"</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="time">0:25 - 0:30</div>
+                    <div class="action">Closing</div>
+                    <div class="visual-focus">Show pause/resume button</div>
+                    <div class="text-overlay">"Privacy-First. No Data Stored."</div>
+                </div>
+            </div>
+            <div class="key-moments">
+                <h3>Key Moments to Capture:</h3>
+                <ul>
+                    <li>Metrics panel with all three metrics visible</li>
+                    <li>Different posture problems (neck tilt, shoulder issues)</li>
+                    <li>Color-coded status indicators</li>
+                    <li>Privacy messaging</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Preview 3 -->
+        <div class="preview-content" id="preview-3">
+            <div class="timeline">
+                <div class="timeline-item">
+                    <div class="time">0:00 - 0:05</div>
+                    <div class="action">Opening: Person at desk with laptop</div>
+                    <div class="text-overlay">"Perfect for Remote Workers & Office Professionals"</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="time">0:05 - 0:12</div>
+                    <div class="action">App running in background</div>
+                    <div class="visual-focus">App window positioned, person working normally</div>
+                    <div class="text-overlay">"Monitor Your Posture While You Work"</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="time">0:12 - 0:20</div>
+                    <div class="action">Posture correction in action</div>
+                    <div class="visual-focus">Person slouches → alert → adjusts → status returns to green</div>
+                    <div class="text-overlay">"Build Better Posture Habits"</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="time">0:20 - 0:25</div>
+                    <div class="action">Show clean, minimal UI</div>
+                    <div class="text-overlay">"Simple. Effective. Private."</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="time">0:25 - 0:30</div>
+                    <div class="action">Closing</div>
+                    <div class="visual-focus">App icon or logo</div>
+                    <div class="text-overlay">"PosturePilot - Your AI Posture Coach"</div>
+                </div>
+            </div>
+            <div class="key-moments">
+                <h3>Key Moments to Capture:</h3>
+                <ul>
+                    <li>Real-world use case (desk setup)</li>
+                    <li>Alert → correction flow</li>
+                    <li>Clean, professional UI</li>
+                    <li>Call to action</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let timerInterval = null;
+        let seconds = 0;
+
+        function showPreview(num) {
+            // Hide all previews
+            document.querySelectorAll('.preview-content').forEach(p => {
+                p.classList.remove('active');
+            });
+            
+            // Show selected preview
+            document.getElementById(`preview-${num}`).classList.add('active');
+            
+            // Update button states
+            document.querySelectorAll('.preview-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Reset timer
+            resetTimer();
+        }
+
+        function startTimer() {
+            if (timerInterval) return;
+            
+            timerInterval = setInterval(() => {
+                seconds++;
+                updateTimer();
+            }, 1000);
+            
+            document.getElementById('timer').classList.add('running');
+        }
+
+        function stopTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            document.getElementById('timer').classList.remove('running');
+        }
+
+        function resetTimer() {
+            stopTimer();
+            seconds = 0;
+            updateTimer();
+        }
+
+        function updateTimer() {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            document.getElementById('timer').textContent = 
+                `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && e.target === document.body) {
+                e.preventDefault();
+                if (timerInterval) {
+                    stopTimer();
+                } else {
+                    startTimer();
+                }
+            }
+            if (e.code === 'KeyR' && e.ctrlKey) {
+                e.preventDefault();
+                resetTimer();
+            }
+        });
+    </script>
+</body>
+</html>
+

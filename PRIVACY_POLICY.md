@@ -1,6 +1,6 @@
 # Privacy Policy for PosturePilot
 
-**Last Updated: [DATE]**
+**Last Updated: November 2025**
 
 ## Introduction
 
@@ -46,6 +46,9 @@ PosturePilot uses the following third-party services:
 - **Purpose**: Real-time pose detection and analysis
 - **Data**: Video frames are processed locally using MediaPipe's on-device models
 - **Privacy**: MediaPipe processes data locally; no data is sent to Google servers
+- **License**: Apache License 2.0 (open source)
+
+The MediaPipe libraries and model files are loaded from jsDelivr CDN, but all pose detection processing occurs entirely on your device. No video data or personal information is transmitted to Google or any third party.
 
 ## Your Rights
 
@@ -59,6 +62,7 @@ You have the right to:
 - All data is stored locally on your device
 - No network transmission of personal data
 - No cloud storage or external servers involved
+- All processing happens on-device
 
 ## Children's Privacy
 
@@ -71,8 +75,8 @@ We may update this Privacy Policy from time to time. We will notify you of any c
 ## Contact Us
 
 If you have questions about this Privacy Policy, please contact us at:
-- **Email**: [YOUR_EMAIL]
-- **Website**: [YOUR_WEBSITE or GitHub repo]
+- **GitHub Issues**: [https://github.com/Tech-Nest-Ventures/PosturePilot/issues](https://github.com/Tech-Nest-Ventures/PosturePilot/issues)
+- **Repository**: [https://github.com/Tech-Nest-Ventures/PosturePilot](https://github.com/Tech-Nest-Ventures/PosturePilot)
 
 ## Compliance
 
@@ -83,5 +87,5 @@ This privacy policy complies with:
 
 ---
 
-**Note**: This is a template. Please customize it with your actual contact information and host it at a publicly accessible URL before submitting to the App Store.
+**PosturePilot** is developed by **TechNest Ventures LLC**.
 
