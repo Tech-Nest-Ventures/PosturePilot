@@ -11,6 +11,9 @@
     "dist": "electron-builder --mac --publish=never",
     "dist:mac": "electron-builder --mac dmg --publish=never",
     "dist:mac:zip": "electron-builder --mac zip --publish=never",
+    "dist:win": "electron-builder --win --publish=never",
+    "dist:linux": "electron-builder --linux --publish=never",
+    "dist:all": "electron-builder --mac --win --linux --publish=never",
     "build:mas": "electron-builder --mac mas",
     "build:mas:dir": "electron-builder --mac mas --dir",
     "dist:mas": "electron-builder --mac mas --publish=never",
@@ -72,7 +75,10 @@
         }
       ],
       "hardenedRuntime": true,
-      "gatekeeperAssess": false
+      "gatekeeperAssess": false,
+      "notarize": {
+        "teamId": "3Y4F3KTSJA"
+      }
     },
     "mas": {
       "provisioningProfile": "build/posturepilot.provisionprofile",
@@ -85,8 +91,18 @@
       "minimumSystemVersion": "12.0"
     },
     "win": {
-      "target": "nsis",
-      "icon": "src/assets/icon.png"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64", "ia32"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "src/assets/icon.png",
+      "publisherName": "PosturePilot"
     },
     "linux": {
       "target": "AppImage",

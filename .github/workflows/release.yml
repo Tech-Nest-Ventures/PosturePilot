@@ -1,0 +1,179 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build for macOS
+        if: matrix.os == 'macos-latest'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_LINK: ${{ secrets.MACOS_CERTIFICATE }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          # Import certificate for code signing
+          if [ -n "$CSC_LINK" ]; then
+            echo "$CSC_LINK" | base64 --decode > certificate.p12
+            security create-keychain -p "" build.keychain
+            security default-keychain -s build.keychain
+            security unlock-keychain -p "" build.keychain
+            security import certificate.p12 -k build.keychain -P "$CSC_KEY_PASSWORD" -T /usr/bin/codesign
+            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" build.keychain
+            rm certificate.p12
+          fi
+          npm run dist:mac
+
+      - name: Build for Windows
+        if: matrix.os == 'windows-latest'
+        env:
+          CSC_LINK: ${{ secrets.WINDOWS_CERTIFICATE }}
+          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: npm run dist:win
+
+      - name: Build for Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: npm run dist:linux
+
+      - name: Upload macOS artifacts
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-builds
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/*.dmg.blockmap
+            dist/*.zip.blockmap
+          retention-days: 30
+
+      - name: Upload Windows artifacts
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-builds
+          path: |
+            dist/*.exe
+            dist/*.portable.exe
+          retention-days: 30
+
+      - name: Upload Linux artifacts
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-builds
+          path: |
+            dist/*.AppImage
+          retention-days: 30
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-builds
+          path: release/macos
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-builds
+          path: release/windows
+
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-builds
+          path: release/linux
+
+      - name: Extract version from tag
+        id: get_version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref }}
+          name: Release ${{ steps.get_version.outputs.version }}
+          body: |
+            ## PosturePilot ${{ steps.get_version.outputs.version }}
+            
+            ### Downloads
+            
+            **macOS:**
+            - DMG: PosturePilot-${{ steps.get_version.outputs.version }}-arm64.dmg (Apple Silicon)
+            - DMG: PosturePilot-${{ steps.get_version.outputs.version }}-x64.dmg (Intel)
+            - ZIP: PosturePilot-${{ steps.get_version.outputs.version }}-arm64-mac.zip (Apple Silicon)
+            - ZIP: PosturePilot-${{ steps.get_version.outputs.version }}-x64-mac.zip (Intel)
+            
+            **Windows:**
+            - Installer: PosturePilot Setup ${{ steps.get_version.outputs.version }}.exe
+            - Portable: PosturePilot-${{ steps.get_version.outputs.version }}.exe
+            
+            **Linux:**
+            - AppImage: PosturePilot-${{ steps.get_version.outputs.version }}.AppImage
+            
+            ### Installation Instructions
+            
+            **macOS:**
+            1. Download the DMG file for your Mac (ARM64 for Apple Silicon, x64 for Intel)
+            2. Open the DMG file
+            3. Drag PosturePilot to Applications
+            4. Open PosturePilot from Applications (you may need to allow it in System Preferences > Security & Privacy)
+            
+            **Windows:**
+            1. Download the installer (.exe) file
+            2. Run the installer and follow the setup wizard
+            3. Or download the portable version if you prefer not to install
+            
+            **Linux:**
+            1. Download the AppImage file
+            2. Make it executable: `chmod +x PosturePilot-*.AppImage`
+            3. Run: `./PosturePilot-*.AppImage`
+          files: |
+            release/macos/*
+            release/windows/*
+            release/linux/*
+          draft: false
+          prerelease: false
+
