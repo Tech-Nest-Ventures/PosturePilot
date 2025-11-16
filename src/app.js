@@ -33,22 +33,41 @@ class PosturePilot {
     }
     
     async checkAuthAndInitialize() {
-        // Wait for auth manager to initialize
-        await new Promise(resolve => {
+        // Wait for auth manager to initialize with timeout
+        const AUTH_MANAGER_TIMEOUT = 10000; // 10 seconds max wait
+        const POLL_INTERVAL = 100; // Check every 100ms
+        
+        await new Promise((resolve) => {
+            // If authManager already exists, resolve immediately
             if (window.authManager) {
                 resolve();
-            } else {
-                const checkInterval = setInterval(() => {
-                    if (window.authManager) {
-                        clearInterval(checkInterval);
-                        resolve();
-                    }
-                }, 100);
+                return;
             }
+            
+            let checkInterval;
+            let timeoutId;
+            
+            // Set up polling interval
+            checkInterval = setInterval(() => {
+                if (window.authManager) {
+                    clearInterval(checkInterval);
+                    clearTimeout(timeoutId);
+                    resolve();
+                }
+            }, POLL_INTERVAL);
+            
+            // Set up timeout to prevent infinite waiting
+            timeoutId = setTimeout(() => {
+                clearInterval(checkInterval);
+                console.warn('AuthManager initialization timeout - proceeding without authentication');
+                // Resolve instead of reject to allow app to continue
+                // User can still authenticate later
+                resolve();
+            }, AUTH_MANAGER_TIMEOUT);
         });
         
-        // Check if user is authenticated
-        const isAuthenticated = window.authManager.getIsAuthenticated();
+        // Check if user is authenticated (guard against null authManager)
+        const isAuthenticated = window.authManager?.getIsAuthenticated() || false;
         
         if (!isAuthenticated) {
             // Show auth screen - auth-ui.js will handle showing it

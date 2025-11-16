@@ -206,7 +206,7 @@ class AuthUI {
                 console.log('Video element found:', !!video);
                 console.log('Camera container found:', !!cameraContainer);
                 console.log('Start camera button found:', !!startCameraBtn);
-                console.log('Setup screen display style:', window.getComputedStyle(setupScreen).display);
+                console.log('Setup screen display style:', setupScreen ? window.getComputedStyle(setupScreen).display : 'not-found');
             }
         });
     }

@@ -482,6 +482,13 @@ button:disabled {
 
 #login-error,
 #signup-error {
+    /* Override .error-message absolute positioning for inline form feedback */
+    position: static;
+    top: auto;
+    left: auto;
+    transform: none;
+    width: 100%;
+    max-width: 100%;
     background: #1a1a1a;
     border: 1px solid #ff4444;
     color: #ff4444;
@@ -490,5 +497,6 @@ button:disabled {
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin-bottom: 16px;
+    margin-top: 0;
     text-align: left;
 }
