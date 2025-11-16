@@ -385,6 +385,19 @@ class PosturePilot {
         // Add the new status class
         this.postureStatus.classList.add(`status-${status}`);
         this.postureStatus.textContent = message;
+        
+        // Update tray icon based on posture status
+        if (window.electronAPI && window.electronAPI.updateTrayIcon) {
+            window.electronAPI.updateTrayIcon(status).then(result => {
+                if (result && !result.success) {
+                    console.warn('Tray icon update returned:', result);
+                }
+            }).catch(err => {
+                console.error('Failed to update tray icon:', err);
+            });
+        } else {
+            console.warn('electronAPI.updateTrayIcon not available');
+        }
     }
 
     // Display live deviation values in the metrics panel

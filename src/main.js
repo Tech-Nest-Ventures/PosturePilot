@@ -1,8 +1,9 @@
-const { app, BrowserWindow, ipcMain, Notification } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification, Tray, nativeImage, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
 
 let mainWindow;
+let tray = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -25,14 +26,168 @@ function createWindow() {
     mainWindow.show();
   });
 
+  // On macOS, hide window instead of closing when user clicks close button
+  mainWindow.on('close', (event) => {
+    if (process.platform === 'darwin') {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+  });
+
   if (process.env.NODE_ENV === 'development') {
     mainWindow.webContents.openDevTools();
   }
 }
 
-app.whenReady().then(createWindow);
+// Create colored tray icon
+function createTrayIcon(color) {
+  try {
+    // Create a simple colored circle icon
+    // macOS menu bar icons work best at 22px (retina) or 16px (non-retina)
+    // We'll use 22px for better visibility
+    const iconSize = 22;
+    const buffer = Buffer.alloc(iconSize * iconSize * 4); // RGBA
+    
+    // Determine icon color based on status - use brighter colors for better visibility
+    let r, g, b;
+    if (color === 'green' || color === 'good') {
+      r = 34; g = 197; b = 94; // Bright green
+    } else if (color === 'red' || color === 'bad' || color === 'warning') {
+      r = 239; g = 68; b = 68; // Bright red
+    } else {
+      r = 156; g = 163; b = 175; // Gray (default/unknown)
+    }
+    
+    // Draw a filled circle - make it more visible
+    const centerX = iconSize / 2;
+    const centerY = iconSize / 2;
+    const radius = iconSize / 2 - 1; // Larger radius for better visibility
+    
+    for (let y = 0; y < iconSize; y++) {
+      for (let x = 0; x < iconSize; x++) {
+        const dx = x - centerX;
+        const dy = y - centerY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        const index = (y * iconSize + x) * 4;
+        if (distance <= radius) {
+          buffer[index] = r;     // R
+          buffer[index + 1] = g; // G
+          buffer[index + 2] = b; // B
+          buffer[index + 3] = 255; // A (fully opaque)
+        } else {
+          buffer[index] = 0;     // R
+          buffer[index + 1] = 0; // G
+          buffer[index + 2] = 0; // B
+          buffer[index + 3] = 0; // A (transparent)
+        }
+      }
+    }
+    
+    const image = nativeImage.createFromBuffer(buffer, { width: iconSize, height: iconSize });
+    
+    // On macOS, explicitly set NOT as template to keep colors visible
+    if (process.platform === 'darwin') {
+      image.setTemplateImage(false); // Keep colors visible (not monochrome template)
+    }
+    
+    // Verify the image was created correctly
+    if (image.isEmpty()) {
+      console.error('Created tray icon is empty, trying fallback');
+      // Try fallback: use the app icon
+      const fallbackPath = path.join(__dirname, 'src', 'assets', 'icon.png');
+      try {
+        const fallback = nativeImage.createFromPath(fallbackPath);
+        if (!fallback.isEmpty()) {
+          console.log('Using fallback icon from file');
+          return fallback;
+        }
+      } catch (err) {
+        console.error('Failed to load fallback icon:', err);
+      }
+      return nativeImage.createEmpty();
+    }
+    
+    console.log(`Tray icon created successfully (${color}, size: ${iconSize}x${iconSize})`);
+    return image;
+  } catch (error) {
+    console.error('Error creating tray icon:', error);
+    // Try fallback: use the app icon
+    const fallbackPath = path.join(__dirname, 'src', 'assets', 'icon.png');
+    try {
+      return nativeImage.createFromPath(fallbackPath);
+    } catch (err) {
+      console.error('Failed to load fallback icon:', err);
+      return nativeImage.createEmpty();
+    }
+  }
+}
+
+function createTray() {
+  try {
+    // Create initial tray icon (gray/default)
+    const icon = createTrayIcon('gray');
+    
+    if (!icon || icon.isEmpty()) {
+      console.error('Failed to create tray icon - icon is empty');
+      return;
+    }
+    
+    tray = new Tray(icon);
+    console.log('Tray icon created successfully');
+    
+    // Set tooltip
+    tray.setToolTip('PosturePilot - Posture Monitor');
+    
+    // Create context menu
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: 'Show PosturePilot',
+        click: () => {
+          if (mainWindow) {
+            mainWindow.show();
+            mainWindow.focus();
+          }
+        }
+      },
+      {
+        label: 'Quit',
+        click: () => {
+          app.quit();
+        }
+      }
+    ]);
+    
+    tray.setContextMenu(contextMenu);
+    
+    // Click to show/hide window
+    tray.on('click', () => {
+      if (mainWindow) {
+        if (mainWindow.isVisible()) {
+          mainWindow.hide();
+        } else {
+          mainWindow.show();
+          mainWindow.focus();
+        }
+      }
+    });
+    
+    console.log('Tray setup complete');
+  } catch (error) {
+    console.error('Error creating tray:', error);
+  }
+}
+
+app.whenReady().then(() => {
+  createWindow();
+  // Create tray after a short delay to ensure app is fully ready
+  setTimeout(() => {
+    createTray();
+  }, 100);
+});
 
 app.on('window-all-closed', () => {
+  // Don't quit on macOS - keep the app running in the menu bar
   if (process.platform !== 'darwin') {
     app.quit();
   }
@@ -128,6 +283,44 @@ ipcMain.handle('show-notification', async (event, { title, body, type }) => {
     }
   } catch (error) {
     console.error('Failed to show notification:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// IPC handler to update tray icon based on posture status
+ipcMain.handle('update-tray-icon', async (event, status) => {
+  try {
+    if (tray) {
+      console.log('Updating tray icon with status:', status);
+      // Map status to icon color
+      let iconColor = 'gray'; // default
+      if (status === 'good') {
+        iconColor = 'green';
+      } else if (status === 'bad' || status === 'warning') {
+        iconColor = 'red';
+      }
+      
+      const icon = createTrayIcon(iconColor);
+      if (icon.isEmpty()) {
+        console.error('Created icon is empty, cannot update tray');
+        return { success: false, error: 'Icon is empty' };
+      }
+      
+      tray.setImage(icon);
+      console.log('Tray icon updated to:', iconColor);
+      
+      // Update tooltip with status
+      const statusText = status === 'good' ? 'Good Posture' : 
+                        status === 'bad' ? 'Bad Posture' : 
+                        status === 'warning' ? 'Warning' : 'Unknown';
+      tray.setToolTip(`PosturePilot - ${statusText}`);
+      
+      return { success: true };
+    }
+    console.error('Tray not initialized, cannot update icon');
+    return { success: false, error: 'Tray not initialized' };
+  } catch (error) {
+    console.error('Failed to update tray icon:', error);
     return { success: false, error: error.message };
   }
 });
