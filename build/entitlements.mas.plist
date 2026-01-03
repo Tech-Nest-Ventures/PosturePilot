@@ -2,6 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+  <!-- Application identifier (required for TestFlight) -->
+  <!-- Format: <TeamID>.<BundleID> -->
+  <key>com.apple.application-identifier</key>
+  <string>3Y4F3KTSJA.com.posturepilot.app</string>
+
   <!-- Required for hardened runtime -->
   <key>com.apple.security.app-sandbox</key>
   <true/>
@@ -14,12 +19,16 @@
   <key>com.apple.security.device.microphone</key>
   <true/>
 
-  <!-- Needed for reading/writing posture logs -->
+  <!-- Needed for reading/writing posture logs (user-selected files only) -->
   <key>com.apple.security.files.user-selected.read-write</key>
   <true/>
 
   <!-- Needed because your app loads MediaPipe model files over HTTPS -->
   <key>com.apple.security.network.client</key>
+  <true/>
+
+  <!-- Network server entitlement (sometimes needed for MAS Electron apps) -->
+  <key>com.apple.security.network.server</key>
   <true/>
 </dict>
 </plist>

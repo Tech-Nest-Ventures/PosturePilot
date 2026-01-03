@@ -14,6 +14,10 @@ class PosturePilot {
         this.countdownValue = 5;
         this.isMonitoring = false;
         this.isInitializing = false;  // Add initialization state
+        this.humanPresent = false;    // Track if human is detected in frame
+        this.pausedDueToNoHuman = false; // Track if monitoring was paused due to no human
+        this.noHumanFrameCount = 0;    // Count consecutive frames without human
+        this.humanDetectionThreshold = 10; // Frames without human before pausing (≈0.33s at 30fps)
         
         // Throttle backend sync to avoid overwhelming the API
         this.lastBackendSync = 0;
@@ -22,14 +26,16 @@ class PosturePilot {
         
         // Fixed ergonomic limits (units after scaling)
         this.POSTURE_LIMITS = {
-            headForward: 0.25,      // horizontal ratio
-            neckTilt: 0.1,          // slope threshold
-            shoulderSlope: 0.15     // uneven shoulders threshold
+            headForward: 0.06,       // horizontal ratio (much stricter - was 0.25)
+            neckTilt: 0.015,         // slope threshold (much stricter - was 0.1)
+            shoulderSlope: 0.10      // uneven shoulders threshold (less strict - shoulder slope has less weight)
         };
         
         this.initializeElements();
         this.eventsBound = false;
         this.checkAuthAndInitialize();
+        this.setupSystemResumeHandler();
+        this.setupQuitHandler();
     }
     
     async checkAuthAndInitialize() {
@@ -130,6 +136,7 @@ class PosturePilot {
 
         try {
             // Create new Pose instance
+            // Use local vendor files instead of CDN to avoid DNS lookups in MAS sandbox
             this.pose = new Pose({
                 locateFile: (file) => {
                     console.log(`Loading MediaPipe file: ${file}`);
@@ -137,7 +144,8 @@ class PosturePilot {
                     if (loadingMsg) {
                         loadingMsg.innerHTML = `Loading model file: ${file}<br/>(This may take a few seconds)`;
                     }
-                    return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
+                    // Use local vendor files instead of CDN
+                    return `vendor/mediapipe/pose/${file}`;
                 }
             });
 
@@ -348,8 +356,10 @@ class PosturePilot {
         console.log('Camera and video setup complete');
         
         this.startCameraBtn.textContent = 'Camera Ready';
-        // Begin automatic calibration (Option A)
-        this.startCalibration();
+        // Begin automatic calibration (Option A) - only if in setup mode
+        if (this.isSetupMode) {
+            this.startCalibration();
+        }
     }
 
     switchToMonitoringMode() {
@@ -384,6 +394,8 @@ class PosturePilot {
     startMonitoring() {
         console.log('Starting monitoring (live mode)...');
         this.isMonitoring = true;
+        this.pausedDueToNoHuman = false; // Reset auto-pause flag
+        this.noHumanFrameCount = 0; // Reset frame counter
         // Show LIVE indicator instead of numerical countdown
         if (this.countdown) {
             this.countdown.textContent = 'LIVE';
@@ -431,38 +443,33 @@ class PosturePilot {
 
         let status = 'good';
         let message = 'Good Posture';
-        let shouldNotify = false;
 
         // Forward-head cluster
         if (normForward > this.POSTURE_LIMITS.headForward) { 
             status = normForward > this.POSTURE_LIMITS.headForward * 1.5  ? 'bad' : 'warning';
-            shouldNotify = true;
         }
 
         // Neck lateral tilt
         if (neckTiltAbs > this.POSTURE_LIMITS.neckTilt) {
             status = status === 'bad' ? 'bad' : 'warning';
             message = status === 'bad' ? message + ' & Head Tilt' : 'Head Tilt';
-            shouldNotify = true;
         }
 
-        // Shoulder height asymmetry
+        // Shoulder height asymmetry (less weight - only triggers warning, never bad status alone)
         if (shoulderSlopeAbs > this.POSTURE_LIMITS.shoulderSlope) {
-            status = status === 'bad' ? 'bad' : 'warning';
-            message = status === 'bad' ? message + ' & Uneven Shoulders' : 'Uneven Shoulders';
-            shouldNotify = true;
+            // Shoulder slope has less weight - only adds warning, doesn't escalate to bad
+            if (status === 'good') {
+                status = 'warning';
+                message = 'Uneven Shoulders';
+            } else if (status === 'warning') {
+                // Only add to message if not already bad
+                message = message.includes('Uneven Shoulders') ? message : message + ' & Uneven Shoulders';
+            }
+            // If status is already 'bad', don't change it (shoulder slope doesn't escalate)
         }
  
-        // Update UI and notifications
+        // Update UI (tray icon color will update automatically)
         this.updatePostureStatus(status, message);
-
-        if (shouldNotify) {
-            window.electronAPI.showNotification({
-                title: 'PosturePilot Alert',
-                body: `${message}. Please adjust your posture.`,
-                type: status
-            });
-        }
 
         // Save posture log locally
         window.electronAPI.savePostureLog({
@@ -575,14 +582,17 @@ class PosturePilot {
 
     toggleMonitoring() {
         if (this.isMonitoring) {
-            // Pause live monitoring
+            // Pause live monitoring (manual pause)
             this.isMonitoring = false;
+            this.pausedDueToNoHuman = false; // Clear auto-pause flag if manually paused
             this.pauseMonitoringBtn.textContent = 'Resume Monitoring';
             if (this.countdown) {
                 this.countdown.textContent = '--';
             }
+            this.updatePostureStatus('warning', 'Monitoring Paused');
         } else {
             // Resume live monitoring
+            this.pausedDueToNoHuman = false; // Clear auto-pause flag
             this.startMonitoring();
             this.pauseMonitoringBtn.textContent = 'Pause Monitoring';
         }
@@ -649,6 +659,48 @@ class PosturePilot {
         currentOverlay.width = 400;
         currentOverlay.height = 300;
         
+        // Check if human is present in frame
+        const humanDetected = results.poseLandmarks && results.poseLandmarks.length > 0;
+        
+        // Update human presence tracking
+        if (humanDetected) {
+            this.humanPresent = true;
+            this.noHumanFrameCount = 0;
+            
+            // If monitoring was paused due to no human, resume it
+            if (this.pausedDueToNoHuman && !this.isSetupMode) {
+                console.log('Human detected - resuming monitoring');
+                this.pausedDueToNoHuman = false;
+                this.isMonitoring = true;
+                this.updatePostureStatus('good', 'Monitoring Resumed');
+                if (this.countdown) {
+                    this.countdown.textContent = 'LIVE';
+                }
+                if (this.pauseMonitoringBtn) {
+                    this.pauseMonitoringBtn.textContent = 'Pause Monitoring';
+                }
+            }
+        } else {
+            // No human detected
+            this.humanPresent = false;
+            this.noHumanFrameCount++;
+            
+            // If monitoring is active and no human for threshold frames, pause monitoring
+            if (!this.isSetupMode && this.isMonitoring && !this.pausedDueToNoHuman && 
+                this.noHumanFrameCount >= this.humanDetectionThreshold) {
+                console.log('No human detected - pausing monitoring');
+                this.pausedDueToNoHuman = true;
+                this.isMonitoring = false;
+                this.updatePostureStatus('warning', 'No Person Detected');
+                if (this.countdown) {
+                    this.countdown.textContent = '--';
+                }
+                if (this.pauseMonitoringBtn) {
+                    this.pauseMonitoringBtn.textContent = 'Resume Monitoring';
+                }
+            }
+        }
+        
         if (results.poseLandmarks) {
             // Store the latest results
             this.lastPoseResults = results;
@@ -679,9 +731,17 @@ class PosturePilot {
                 return; // skip analysis until calibrated
             }
 
-            // Analyze posture once calibrated and monitoring
-            if (!this.isSetupMode && this.isMonitoring && this.scaleFactor) {
+            // Analyze posture once calibrated and monitoring (and human is present)
+            if (!this.isSetupMode && this.isMonitoring && this.scaleFactor && this.humanPresent) {
                 this.analyzePosture(results.poseLandmarks);
+            }
+        } else {
+            // No pose landmarks - draw a message on overlay if in monitoring mode
+            if (!this.isSetupMode && this.isMonitoring) {
+                ctx.fillStyle = '#FFA500';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('No person detected', currentOverlay.width / 2, currentOverlay.height / 2);
             }
         }
     }
@@ -834,24 +894,237 @@ class PosturePilot {
         console.warn('Manual setup finish is no longer used. App uses automatic calibration.');
     }
 
+    // Set up handler for system resume events (wake from sleep)
+    setupSystemResumeHandler() {
+        if (window.electronAPI && window.electronAPI.onSystemResume) {
+            window.electronAPI.onSystemResume(() => {
+                console.log('System resumed - checking camera connection...');
+                // Wait a moment for system to fully wake up
+                setTimeout(() => {
+                    this.recheckCameraConnection();
+                }, 1000);
+            });
+            console.log('System resume handler set up');
+        }
+    }
+
+    // Set up handler for app quit requests
+    setupQuitHandler() {
+        if (window.electronAPI && window.electronAPI.onAppQuitRequested) {
+            window.electronAPI.onAppQuitRequested(() => {
+                console.log('App quit requested - cleaning up...');
+                this.cleanup();
+            });
+            console.log('App quit handler set up');
+        }
+    }
+
+    // Check if camera stream is still active and reinitialize if needed
+    async recheckCameraConnection() {
+        // Only recheck if camera was already initialized
+        if (!this.camera || !this.video) {
+            console.log('Camera not initialized, skipping recheck');
+            return;
+        }
+
+        // Check if video stream is still active
+        const stream = this.video.srcObject;
+        if (!stream) {
+            console.log('No video stream found - reinitializing camera...');
+            await this.reinitializeCamera();
+            return;
+        }
+
+        // Check if any tracks are still active
+        const tracks = stream.getTracks();
+        const activeTracks = tracks.filter(track => track.readyState === 'live');
+        
+        if (activeTracks.length === 0) {
+            console.log('No active camera tracks found - reinitializing camera...');
+            await this.reinitializeCamera();
+            return;
+        }
+
+        // Check if video element is playing and has data
+        if (this.video.readyState < this.video.HAVE_METADATA) {
+            console.log('Video not ready - reinitializing camera...');
+            await this.reinitializeCamera();
+            return;
+        }
+
+        // Try to play video if it's paused
+        if (this.video.paused) {
+            console.log('Video is paused - attempting to resume...');
+            try {
+                await this.video.play();
+                console.log('Video resumed successfully');
+            } catch (error) {
+                console.error('Failed to resume video:', error);
+                console.log('Reinitializing camera...');
+                await this.reinitializeCamera();
+            }
+        } else {
+            console.log('Camera connection appears healthy');
+        }
+    }
+
+    // Reinitialize camera after system wake
+    async reinitializeCamera() {
+        console.log('Reinitializing camera after system wake...');
+        
+        // Prevent multiple simultaneous reinitializations
+        if (this.isInitializing) {
+            console.log('Already initializing, skipping...');
+            return;
+        }
+
+        try {
+            this.isInitializing = true;
+
+            // Store current state to preserve it after reinitialization
+            const wasInMonitoringMode = !this.isSetupMode;
+            const hadCalibration = this.scaleFactor !== null;
+
+            // Stop existing camera and stream
+            if (this.camera) {
+                try {
+                    this.camera.stop();
+                } catch (error) {
+                    console.error('Error stopping camera:', error);
+                }
+            }
+
+            if (this.video.srcObject) {
+                const tracks = this.video.srcObject.getTracks();
+                tracks.forEach(track => {
+                    try {
+                        track.stop();
+                    } catch (error) {
+                        console.error('Error stopping track:', error);
+                    }
+                });
+            }
+
+            // Clear video source
+            this.video.srcObject = null;
+
+            // Wait a moment for cleanup
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Request new camera stream
+            console.log('Requesting new camera stream...');
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    width: 640, 
+                    height: 480,
+                    facingMode: 'user'
+                } 
+            });
+
+            // Set up video stream again
+            await this.setupVideoStream(stream);
+
+            // If we were in monitoring mode with calibration, restore that state
+            if (wasInMonitoringMode && hadCalibration) {
+                console.log('Restoring monitoring mode after camera reconnection');
+                // Don't restart calibration - we already have scaleFactor
+                // Just ensure we're in monitoring mode
+                if (this.isSetupMode) {
+                    // If somehow we're back in setup mode, switch back to monitoring
+                    this.isSetupMode = false;
+                }
+            }
+
+            console.log('Camera reinitialized successfully after system wake');
+        } catch (error) {
+            console.error('Error reinitializing camera after system wake:', error);
+            // Show error message but don't block the app
+            const errorMsg = document.createElement('div');
+            errorMsg.className = 'error-message';
+            errorMsg.textContent = 'Camera reconnection failed. Please click "Start Camera" to reconnect.';
+            errorMsg.style.position = 'absolute';
+            errorMsg.style.top = '10px';
+            errorMsg.style.left = '50%';
+            errorMsg.style.transform = 'translateX(-50%)';
+            errorMsg.style.backgroundColor = 'rgba(239, 68, 68, 0.9)';
+            errorMsg.style.color = 'white';
+            errorMsg.style.padding = '10px 20px';
+            errorMsg.style.borderRadius = '5px';
+            errorMsg.style.zIndex = '1000';
+            
+            const container = this.video.parentElement;
+            if (container) {
+                // Remove any existing error messages
+                const existingErrors = container.querySelectorAll('.error-message');
+                existingErrors.forEach(msg => msg.remove());
+                container.appendChild(errorMsg);
+                
+                // Auto-remove after 5 seconds
+                setTimeout(() => {
+                    errorMsg.remove();
+                }, 5000);
+            }
+
+            // Reset button state
+            if (this.startCameraBtn) {
+                this.startCameraBtn.disabled = false;
+                this.startCameraBtn.textContent = 'Start Camera';
+            }
+        } finally {
+            this.isInitializing = false;
+        }
+    }
+
     // Add cleanup method
     cleanup() {
         console.log('Cleaning up...');
         this.isInitializing = false;
+        this.isMonitoring = false;
+        
+        // Clear all intervals
         if (this.countdownInterval) {
             clearInterval(this.countdownInterval);
+            this.countdownInterval = null;
         }
+        if (this.monitoringInterval) {
+            clearInterval(this.monitoringInterval);
+            this.monitoringInterval = null;
+        }
+        
+        // Stop camera
         if (this.camera) {
-            this.camera.stop();
+            try {
+                this.camera.stop();
+            } catch (error) {
+                console.error('Error stopping camera:', error);
+            }
+            this.camera = null;
         }
-        if (this.video.srcObject) {
+        
+        // Stop video tracks
+        if (this.video && this.video.srcObject) {
             const tracks = this.video.srcObject.getTracks();
-            tracks.forEach(track => track.stop());
+            tracks.forEach(track => {
+                try {
+                    track.stop();
+                } catch (error) {
+                    console.error('Error stopping track:', error);
+                }
+            });
+            this.video.srcObject = null;
         }
+        
+        // Close pose detection
         if (this.pose) {
-            this.pose.close();
+            try {
+                this.pose.close();
+            } catch (error) {
+                console.error('Error closing pose detection:', error);
+            }
             this.pose = null;
         }
+        
+        console.log('Cleanup complete');
     }
 }
 

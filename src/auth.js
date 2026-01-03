@@ -15,13 +15,31 @@ class AuthManager {
     }
 
     async init() {
-        // Load stored token on initialization
+        // MAS builds: NO network calls on startup to prevent DNS crashes
+        const isMas = window.electronAPI?.isMas;
+        if (isMas) {
+            console.log('MAS build: Skipping ALL startup network calls to prevent sandbox crashes');
+            // Load token from storage but don't verify (no network call)
+            try {
+                const storedToken = await window.electronAPI.getAuthToken();
+                if (storedToken) {
+                    this.token = storedToken;
+                    this.isAuthenticated = true;
+                    // Token will be verified on first user action (login, etc.)
+                }
+            } catch (error) {
+                console.error('Error loading auth token:', error);
+            }
+            return; // Exit early - no network calls
+        }
+        
+        // Non-MAS builds: Normal startup behavior
         try {
             const storedToken = await window.electronAPI.getAuthToken();
             if (storedToken) {
                 this.token = storedToken;
                 this.isAuthenticated = true;
-                // Optionally verify token is still valid
+                // Verify token is still valid (only in dev/DMG builds)
                 await this.verifyToken();
             }
         } catch (error) {
@@ -114,11 +132,20 @@ class AuthManager {
     }
 
     async verifyToken() {
+        // MAS builds: Block ALL network calls in verifyToken() to prevent DNS crashes
+        // This method should only be called on user action, not startup
+        const isMas = window.electronAPI?.isMas;
+        if (isMas) {
+            console.log('MAS build: verifyToken() blocked – no network calls allowed to prevent sandbox crash');
+            // Return false to indicate token needs verification, but don't crash the app
+            return false;
+        }
+        
         if (!this.token) {
             this.isAuthenticated = false;
             return false;
         }
-
+        
         // Try to verify token by making a lightweight API call
         // If verify endpoint doesn't exist, we'll test with posture stats endpoint
         try {
@@ -147,6 +174,10 @@ class AuthManager {
             console.error('Token verification error:', error);
             // On network errors, keep the token but don't mark as verified
             // This allows offline usage
+            // In MAS builds, this is expected on startup - token will be verified on user action
+            if (isMas) {
+                console.log('MAS build: Network error during token verification (expected on startup)');
+            }
             return false;
         }
     }

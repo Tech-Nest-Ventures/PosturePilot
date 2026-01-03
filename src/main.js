@@ -1,6 +1,13 @@
-const { app, BrowserWindow, ipcMain, Notification, Tray, nativeImage, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification, Tray, nativeImage, Menu, powerMonitor } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
+
+// MAS-specific flags to prevent DNS crashes in sandbox
+
+// Verify flags are set by checking command line
+// const args = process.argv;
+// console.log('Electron command line args:', args);
+// console.log('Applied MAS-safe Electron flags for sandbox compatibility');
 
 let mainWindow;
 let tray = null;
@@ -61,7 +68,14 @@ function createWindow() {
   
   // On macOS, move window off-screen instead of closing when user clicks close button
   // This keeps the window "visible" so camera doesn't pause
+  // However, if app is quitting, allow the close
   mainWindow.on('close', (event) => {
+    // Check if app is quitting (not just window close)
+    if (app.isQuitting) {
+      // App is quitting, allow close and cleanup will happen in before-quit
+      return;
+    }
+    
     if (process.platform === 'darwin') {
       event.preventDefault();
       // Move off-screen instead of hiding/minimizing
@@ -89,7 +103,9 @@ function createWindow() {
     moveWindowOffScreen();
   });
 
-  if (process.env.NODE_ENV === 'development') {
+  // Only open DevTools in development (not in packaged builds)
+  // This prevents DevTools-related crashes on macOS Sequoia
+  if (!app.isPackaged) {
     mainWindow.webContents.openDevTools();
   }
 }
@@ -229,7 +245,18 @@ function createTray() {
       {
         label: 'Quit',
         click: () => {
-          app.quit();
+          // Mark that app is quitting
+          app.isQuitting = true;
+          // Trigger cleanup in renderer, then quit
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('app-quit-requested');
+            // Give renderer a moment to clean up, then quit
+            setTimeout(() => {
+              app.quit();
+            }, 100);
+          } else {
+            app.quit();
+          }
         }
       }
     ]);
@@ -281,6 +308,27 @@ app.whenReady().then(() => {
     }
   }, 200);
   
+  // Set up power monitor to detect system wake events
+  if (powerMonitor) {
+    // Detect when system wakes up from sleep/hibernate
+    powerMonitor.on('resume', () => {
+      console.log('System resumed from sleep - notifying renderer to recheck camera');
+      // Send message to renderer process to recheck camera
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('system-resume');
+      }
+    });
+    
+    // Also detect when system is about to suspend (optional, for logging)
+    powerMonitor.on('suspend', () => {
+      console.log('System suspending...');
+    });
+    
+    console.log('Power monitor initialized for camera reconnection');
+  } else {
+    console.warn('powerMonitor not available on this platform');
+  }
+  
   // Note: Electron's Notification API doesn't require explicit permission request
   // macOS will prompt automatically on first notification if needed
   // Notifications should work by default in Electron
@@ -301,7 +349,14 @@ if (process.platform === 'darwin') {
   
   // Ensure app can receive notifications when in background
   app.on('before-quit', (event) => {
-    // Allow quit if explicitly requested
+    // Trigger cleanup in renderer before quitting
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('app-quit-requested');
+      // Give renderer a moment to clean up
+      setTimeout(() => {
+        // Quit will proceed after cleanup
+      }, 100);
+    }
   });
 }
 
