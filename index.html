@@ -94,7 +94,7 @@
                                 <div id="posture-status" class="status-good">Good Posture</div>
                                 <div class="next-check">Status: <span id="countdown">--</span></div>
                             </div>
-                            <button id="pause-monitoring-btn" class="pause-btn">Stop Tracking</button>
+                            <button id="pause-monitoring-btn" class="pause-btn">Pause Monitoring</button>
                         </div>
                         <div id="metrics-panel" class="metrics">
                             <h3>Live Metrics</h3>
@@ -111,31 +111,11 @@
         </main>
     </div>
 
-    <!-- Global error handler - MUST be first to catch all errors -->
+    <!-- Global error handler to prevent crashes in MAS builds -->
     <script>
-        // Set up error handlers BEFORE any other scripts load
-        // This ensures we catch script loading failures
-        
-        // Track script loading state
-        window.__scriptLoadState = {
-            loaded: {},
-            failed: {},
-            allLoaded: false
-        };
-        
         // Catch unhandled errors and log them instead of crashing
         window.addEventListener('error', (event) => {
             console.error('Unhandled error:', event.error || event.message, event.filename, event.lineno);
-            
-            // If it's a script loading error, mark it as failed
-            if (event.target && event.target.tagName === 'SCRIPT') {
-                const src = event.target.src || event.target.getAttribute('src');
-                if (src) {
-                    window.__scriptLoadState.failed[src] = true;
-                    console.error('Script failed to load:', src);
-                }
-            }
-            
             // Prevent default error handling that might crash the app
             event.preventDefault();
             return false;
@@ -147,112 +127,15 @@
             // Prevent default error handling
             event.preventDefault();
         });
-        
-        // Function to load a script with error handling
-        function loadScript(src, onLoad, onError) {
-            return new Promise((resolve, reject) => {
-                const script = document.createElement('script');
-                script.src = src;
-                script.async = false; // Load synchronously to maintain order
-                
-                script.onload = () => {
-                    window.__scriptLoadState.loaded[src] = true;
-                    console.log('Script loaded successfully:', src);
-                    if (onLoad) onLoad();
-                    resolve();
-                };
-                
-                script.onerror = (error) => {
-                    window.__scriptLoadState.failed[src] = true;
-                    console.error('Script failed to load:', src, error);
-                    if (onError) onError(error);
-                    reject(new Error(`Failed to load script: ${src}`));
-                };
-                
-                document.head.appendChild(script);
-            });
-        }
-        
-        // Function to verify all required scripts loaded
-        function verifyScriptsLoaded() {
-            const requiredScripts = [
-                'vendor/mediapipe/camera_utils/camera_utils.js',
-                'vendor/mediapipe/drawing_utils/drawing_utils.js',
-                'vendor/mediapipe/pose/pose.js',
-                'auth.js',
-                'auth-ui.js',
-                'app.js'
-            ];
-            
-            const failed = requiredScripts.filter(src => window.__scriptLoadState.failed[src]);
-            const loaded = requiredScripts.filter(src => window.__scriptLoadState.loaded[src]);
-            
-            if (failed.length > 0) {
-                console.error('Some scripts failed to load:', failed);
-                showScriptLoadError(failed);
-                return false;
-            }
-            
-            // Check if MediaPipe is available
-            if (typeof Pose === 'undefined') {
-                console.error('MediaPipe Pose library not available after script load');
-                showScriptLoadError(['MediaPipe Pose library']);
-                return false;
-            }
-            
-            console.log('All scripts loaded successfully');
-            window.__scriptLoadState.allLoaded = true;
-            return true;
-        }
-        
-        // Function to show error message if scripts fail to load
-        function showScriptLoadError(failedScripts) {
-            const errorDiv = document.createElement('div');
-            errorDiv.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #ef4444; color: white; padding: 40px; text-align: center; z-index: 10000; display: flex; flex-direction: column; justify-content: center; align-items: center;';
-            errorDiv.innerHTML = `
-                <h2 style="margin: 0 0 20px 0; font-size: 24px;">Application Error</h2>
-                <p style="margin: 10px 0; font-size: 16px;">Failed to load required files:</p>
-                <ul style="text-align: left; margin: 20px 0;">
-                    ${failedScripts.map(s => `<li>${s}</li>`).join('')}
-                </ul>
-                <p style="margin: 20px 0; font-size: 14px;">Please restart the application.</p>
-            `;
-            document.body.appendChild(errorDiv);
-        }
-        
-        // Store loadScript function globally for use
-        window.__loadScript = loadScript;
-        window.__verifyScriptsLoaded = verifyScriptsLoaded;
     </script>
     
-    <!-- Load scripts with error handling -->
-    <script>
-        // Load scripts sequentially with error handling
-        (async function() {
-            try {
-                console.log('Starting script loading...');
-                
-                // Load MediaPipe scripts first
-                await window.__loadScript('vendor/mediapipe/camera_utils/camera_utils.js');
-                await window.__loadScript('vendor/mediapipe/drawing_utils/drawing_utils.js');
-                await window.__loadScript('vendor/mediapipe/pose/pose.js');
-                
-                // Load app scripts
-                await window.__loadScript('auth.js');
-                await window.__loadScript('auth-ui.js');
-                await window.__loadScript('app.js');
-                
-                // Verify all scripts loaded and dependencies are available
-                if (window.__verifyScriptsLoaded()) {
-                    console.log('All scripts loaded successfully, app should initialize');
-                } else {
-                    console.error('Script verification failed');
-                }
-            } catch (error) {
-                console.error('Error during script loading:', error);
-                // Error UI is shown by showScriptLoadError
-            }
-        })();
-    </script>
+    <!-- MediaPipe loaded from local vendor files (no CDN DNS lookups) -->
+    <!-- Note: Scripts load synchronously - ensure vendor files are accessible in MAS build -->
+    <script src="vendor/mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="vendor/mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="vendor/mediapipe/pose/pose.js"></script>
+    <script src="auth.js"></script>
+    <script src="auth-ui.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>

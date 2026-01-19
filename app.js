@@ -36,7 +36,6 @@ class PosturePilot {
         this.checkAuthAndInitialize();
         this.setupSystemResumeHandler();
         this.setupQuitHandler();
-        this.setupWindowFocusHandlers();
     }
     
     async checkAuthAndInitialize() {
@@ -151,26 +150,11 @@ class PosturePilot {
                     if (loadingMsg) {
                         loadingMsg.innerHTML = `Loading model file: ${file}<br/>(This may take a few seconds)`;
                     }
-                    
-                    // Try multiple path resolution strategies for MAS builds
-                    const pathStrategies = [
-                        // Strategy 1: Relative path from HTML (standard)
-                        `vendor/mediapipe/pose/${file}`,
-                        // Strategy 2: Absolute path from app root (MAS fallback)
-                        `./vendor/mediapipe/pose/${file}`,
-                        // Strategy 3: Path with leading slash (some MAS builds)
-                        `/vendor/mediapipe/pose/${file}`
-                    ];
-                    
-                    // In MAS builds, try to resolve using file:// protocol if needed
-                    const isMas = window.electronAPI?.isMas || false;
-                    
-                    // For now, use the first strategy (relative path)
-                    // If this fails, MediaPipe will throw an error which we'll catch
-                    const filePath = pathStrategies[0];
-                    console.log(`Resolved MediaPipe file path: ${filePath} (MAS: ${isMas})`);
-                    
-                    // If we're in MAS and the path doesn't work, we'll catch the error below
+                    // Use relative path from HTML file location
+                    // In MAS builds, paths are resolved relative to the HTML file
+                    // The HTML is at src/index.html, so vendor/ paths resolve correctly
+                    const filePath = `vendor/mediapipe/pose/${file}`;
+                    console.log(`Resolved MediaPipe file path: ${filePath}`);
                     return filePath;
                 }
             });
@@ -236,29 +220,7 @@ class PosturePilot {
             
         } catch (error) {
             console.error('Failed to initialize MediaPipe:', error);
-            
-            // Provide more detailed error information
-            const errorMessage = error.message || 'Unknown error';
-            console.error('MediaPipe initialization error details:', {
-                message: errorMessage,
-                stack: error.stack,
-                isMas: window.electronAPI?.isMas || false
-            });
-            
-            // Show user-friendly error message
-            if (loadingMsg) {
-                loadingMsg.innerHTML = `
-                    <div style="color: #ef4444; padding: 20px;">
-                        <h3>Failed to Load Pose Detection</h3>
-                        <p>Error: ${errorMessage}</p>
-                        <p>Please restart the application.</p>
-                    </div>
-                `;
-            }
-            
-            // Don't throw - let the app continue without pose detection
-            // The user can try again later
-            throw new Error(`Failed to initialize pose detection: ${errorMessage}`);
+            throw new Error('Failed to initialize pose detection. Please try again.');
         }
     }
 
@@ -630,184 +592,19 @@ class PosturePilot {
 
     toggleMonitoring() {
         if (this.isMonitoring) {
-            // Stop tracking - fully release camera
-            this.stopTracking();
+            // Pause live monitoring (manual pause)
+            this.isMonitoring = false;
+            this.pausedDueToNoHuman = false; // Clear auto-pause flag if manually paused
+            this.pauseMonitoringBtn.textContent = 'Resume Monitoring';
+            if (this.countdown) {
+                this.countdown.textContent = '--';
+            }
+            this.updatePostureStatus('warning', 'Monitoring Paused');
         } else {
-            // Restart tracking - re-request permissions and reinitialize
-            this.restartTracking();
-        }
-    }
-
-    // Fully stop tracking and release camera
-    async stopTracking() {
-        console.log('Stopping tracking and releasing camera...');
-        
-        // Stop monitoring
-        this.isMonitoring = false;
-        this.pausedDueToNoHuman = false;
-        
-        // Update UI
-        this.pauseMonitoringBtn.disabled = true;
-        this.pauseMonitoringBtn.textContent = 'Stopping...';
-        if (this.countdown) {
-            this.countdown.textContent = '--';
-        }
-        this.updatePostureStatus('warning', 'Stopping...');
-        
-        try {
-            // Stop camera
-            if (this.camera) {
-                try {
-                    this.camera.stop();
-                    console.log('Camera stopped');
-                } catch (error) {
-                    console.error('Error stopping camera:', error);
-                }
-                this.camera = null;
-            }
-            
-            // Stop all video tracks and release camera
-            if (this.video && this.video.srcObject) {
-                const tracks = this.video.srcObject.getTracks();
-                tracks.forEach(track => {
-                    try {
-                        track.stop();
-                        console.log('Video track stopped:', track.kind);
-                    } catch (error) {
-                        console.error('Error stopping track:', error);
-                    }
-                });
-                this.video.srcObject = null;
-                console.log('Video source cleared');
-            }
-            
-            // Pause video element
-            if (this.video) {
-                this.video.pause();
-            }
-            
-            // Close pose detection
-            if (this.pose) {
-                try {
-                    this.pose.close();
-                    console.log('Pose detection closed');
-                } catch (error) {
-                    console.error('Error closing pose detection:', error);
-                }
-                this.pose = null;
-            }
-            
-            // Clear intervals
-            if (this.countdownInterval) {
-                clearInterval(this.countdownInterval);
-                this.countdownInterval = null;
-            }
-            if (this.monitoringInterval) {
-                clearInterval(this.monitoringInterval);
-                this.monitoringInterval = null;
-            }
-            
-            // Wait a moment for cleanup
-            await new Promise(resolve => setTimeout(resolve, 300));
-            
-            // Update UI
-            this.pauseMonitoringBtn.disabled = false;
-            this.pauseMonitoringBtn.textContent = 'Start Tracking';
-            this.updatePostureStatus('warning', 'Tracking Stopped');
-            
-            console.log('Camera fully released');
-        } catch (error) {
-            console.error('Error during stop tracking:', error);
-            this.pauseMonitoringBtn.disabled = false;
-            this.pauseMonitoringBtn.textContent = 'Start Tracking';
-        }
-    }
-
-    // Restart tracking - re-request permissions and reinitialize
-    async restartTracking() {
-        console.log('Restarting tracking - re-requesting permissions...');
-        
-        // Prevent multiple simultaneous restarts
-        if (this.isInitializing) {
-            console.log('Already initializing, please wait...');
-            return;
-        }
-        
-        this.pauseMonitoringBtn.disabled = true;
-        this.pauseMonitoringBtn.textContent = 'Starting...';
-        
-        try {
-            this.isInitializing = true;
-            
-            // Show loading state
-            const loadingMsg = document.createElement('div');
-            loadingMsg.className = 'loading-message';
-            loadingMsg.textContent = 'Requesting camera permission...';
-            const container = this.video.parentElement;
-            const existingMsgs = container.querySelectorAll('.loading-message, .error-message');
-            existingMsgs.forEach(msg => msg.remove());
-            container.appendChild(loadingMsg);
-            
-            // Re-request camera permission
-            console.log('Requesting camera permission...');
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { 
-                    width: 640, 
-                    height: 480,
-                    facingMode: 'user'
-                } 
-            });
-            
-            loadingMsg.textContent = 'Loading pose detection...';
-            
-            // Reinitialize pose detection
-            console.log('Reinitializing pose detection...');
-            await this.initializePoseDetection();
-            
-            loadingMsg.textContent = 'Setting up video...';
-            
-            // Set up video stream again
-            await this.setupVideoStream(stream);
-            
-            // Remove loading message
-            loadingMsg.remove();
-            
-            // Restore monitoring state if we were in monitoring mode
-            if (!this.isSetupMode && this.scaleFactor) {
-                // We're already calibrated, just start monitoring
-                this.startMonitoring();
-                this.pauseMonitoringBtn.textContent = 'Stop Tracking';
-            } else if (this.isSetupMode) {
-                // We're in setup mode, start calibration
-                this.startCalibration();
-                this.pauseMonitoringBtn.textContent = 'Stop Tracking';
-            }
-            
-            this.pauseMonitoringBtn.disabled = false;
-            console.log('Tracking restarted successfully');
-            
-        } catch (error) {
-            console.error('Error restarting tracking:', error);
-            this.pauseMonitoringBtn.disabled = false;
-            this.pauseMonitoringBtn.textContent = 'Start Tracking';
-            
-            // Show error message
-            const errorMsg = document.createElement('div');
-            errorMsg.className = 'error-message';
-            errorMsg.textContent = 'Failed to restart camera. Please check permissions.';
-            const container = this.video.parentElement;
-            const existingMsgs = container.querySelectorAll('.loading-message, .error-message');
-            existingMsgs.forEach(msg => msg.remove());
-            container.appendChild(errorMsg);
-            
-            // Auto-remove after 5 seconds
-            setTimeout(() => {
-                errorMsg.remove();
-            }, 5000);
-            
-            alert('Could not access camera. Please ensure camera permissions are granted.');
-        } finally {
-            this.isInitializing = false;
+            // Resume live monitoring
+            this.pausedDueToNoHuman = false; // Clear auto-pause flag
+            this.startMonitoring();
+            this.pauseMonitoringBtn.textContent = 'Pause Monitoring';
         }
     }
 
@@ -890,7 +687,7 @@ class PosturePilot {
                     this.countdown.textContent = 'LIVE';
                 }
                 if (this.pauseMonitoringBtn) {
-                    this.pauseMonitoringBtn.textContent = 'Stop Tracking';
+                    this.pauseMonitoringBtn.textContent = 'Pause Monitoring';
                 }
             }
         } else {
@@ -908,10 +705,8 @@ class PosturePilot {
                 if (this.countdown) {
                     this.countdown.textContent = '--';
                 }
-                // Keep button as "Stop Tracking" since camera is still running
-                // User can click to fully stop if needed
                 if (this.pauseMonitoringBtn) {
-                    this.pauseMonitoringBtn.textContent = 'Stop Tracking';
+                    this.pauseMonitoringBtn.textContent = 'Resume Monitoring';
                 }
             }
         }
@@ -1132,50 +927,6 @@ class PosturePilot {
             });
             console.log('App quit handler set up');
         }
-    }
-
-    // Set up handlers for window focus/blur to detect when other apps might use camera
-    setupWindowFocusHandlers() {
-        // Track if we should auto-release camera on blur
-        this.autoReleaseOnBlur = false;
-        
-        // When window loses focus, check if we should release camera
-        // This helps when switching to Zoom or other video apps
-        window.addEventListener('blur', () => {
-            console.log('Window lost focus - checking if camera should be released...');
-            // Only auto-release if monitoring is active
-            // User can manually stop if they want to keep it running
-            if (this.isMonitoring && this.camera) {
-                // Check if camera tracks are still active
-                if (this.video && this.video.srcObject) {
-                    const tracks = this.video.srcObject.getTracks();
-                    const activeTracks = tracks.filter(track => track.readyState === 'live');
-                    
-                    // If tracks are no longer live, another app might have taken the camera
-                    if (activeTracks.length === 0) {
-                        console.log('Camera tracks no longer active - another app may be using camera');
-                        // Don't auto-stop, but log it for user awareness
-                        // User can manually stop if needed
-                    }
-                }
-            }
-        });
-        
-        // When window gains focus, check camera status
-        window.addEventListener('focus', () => {
-            console.log('Window gained focus - checking camera status...');
-            // If we were monitoring but camera is not active, offer to restart
-            if (this.isMonitoring && (!this.camera || !this.video || !this.video.srcObject)) {
-                console.log('Monitoring was active but camera is not - camera may have been taken by another app');
-                // Update UI to indicate camera needs restart
-                if (this.pauseMonitoringBtn) {
-                    this.pauseMonitoringBtn.textContent = 'Restart Tracking';
-                }
-                this.updatePostureStatus('warning', 'Camera unavailable - click to restart');
-            }
-        });
-        
-        console.log('Window focus handlers set up');
     }
 
     // Check if camera stream is still active and reinitialize if needed

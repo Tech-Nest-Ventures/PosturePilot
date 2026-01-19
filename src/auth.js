@@ -9,12 +9,62 @@ class AuthManager {
         this.token = null;
         this.user = null;
         this.isAuthenticated = false;
+        this.initialized = false;
         
-        // Initialize on load
-        this.init();
+        // Don't initialize immediately - wait for electronAPI to be available
+        // This prevents crashes in MAS builds where electronAPI might not be ready
+        this.waitForElectronAPI().then(() => {
+            this.init();
+        }).catch((error) => {
+            console.error('Failed to initialize AuthManager:', error);
+            // Continue without authentication - app can still work
+            this.initialized = true;
+        });
+    }
+
+    async waitForElectronAPI() {
+        // Wait for electronAPI to be available with timeout
+        const ELECTRON_API_TIMEOUT = 10000; // 10 seconds max wait
+        const POLL_INTERVAL = 100; // Check every 100ms
+        
+        return new Promise((resolve, reject) => {
+            // If electronAPI already exists, resolve immediately
+            if (window.electronAPI) {
+                resolve();
+                return;
+            }
+            
+            let checkInterval;
+            let timeoutId;
+            
+            // Set up polling interval
+            checkInterval = setInterval(() => {
+                if (window.electronAPI) {
+                    clearInterval(checkInterval);
+                    clearTimeout(timeoutId);
+                    resolve();
+                }
+            }, POLL_INTERVAL);
+            
+            // Set up timeout to prevent infinite waiting
+            timeoutId = setTimeout(() => {
+                clearInterval(checkInterval);
+                console.warn('electronAPI initialization timeout - AuthManager will work in limited mode');
+                // Resolve instead of reject to allow app to continue
+                // Auth features will be disabled but app won't crash
+                resolve();
+            }, ELECTRON_API_TIMEOUT);
+        });
     }
 
     async init() {
+        // Check if electronAPI is available
+        if (!window.electronAPI) {
+            console.warn('electronAPI not available - AuthManager running in limited mode');
+            this.initialized = true;
+            return;
+        }
+        
         // MAS builds: NO network calls on startup to prevent DNS crashes
         const isMas = window.electronAPI?.isMas;
         if (isMas) {
@@ -29,7 +79,9 @@ class AuthManager {
                 }
             } catch (error) {
                 console.error('Error loading auth token:', error);
+                // Don't crash - continue without authentication
             }
+            this.initialized = true;
             return; // Exit early - no network calls
         }
         
@@ -44,6 +96,9 @@ class AuthManager {
             }
         } catch (error) {
             console.error('Error loading auth token:', error);
+            // Don't crash - continue without authentication
+        } finally {
+            this.initialized = true;
         }
     }
 
@@ -267,7 +322,17 @@ class AuthManager {
     }
 }
 
-// Export singleton instance
-const authManager = new AuthManager();
-window.authManager = authManager;
+// Export singleton instance - but delay until DOM is ready
+// This ensures electronAPI is available and DOM elements exist
+let authManager;
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        authManager = new AuthManager();
+        window.authManager = authManager;
+    });
+} else {
+    // DOM already loaded
+    authManager = new AuthManager();
+    window.authManager = authManager;
+}
 

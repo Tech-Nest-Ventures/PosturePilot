@@ -1,6 +1,6 @@
 {
   "name": "posture-pilot",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "A cross-platform posture monitoring app",
   "main": "src/main.js",
   "scripts": {
@@ -33,7 +33,7 @@
   "author": "PosturePilot",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^39.2.3",
+    "electron": "^40.0.0",
     "electron-builder": "^26.0.12",
     "svg2png": "^4.1.1"
   },
